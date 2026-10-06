@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  The Checkstyle rule set for src/test. Deliberately light: the size, parameter and
+  magic-number limits of checkstyle.xml fit production code, not a test that builds a
+  fixture or asserts a literal. Only what holds in every Java file goes here, plus the
+  test-only shape testing.md makes mechanical.
+
+  Imports and formatting are not here either: `spotless:check` covers src/test at `verify`.
+
+  Maven runs this file in a second checkstyle execution bound to `verify`, never
+  `validate` — the edit-time compile check would pay a second plugin run on every Java
+  edit.
+-->
+<module name="Checker">
+  <property name="severity" value="error"/>
+  <property name="charset" value="UTF-8"/>
+
+  <module name="TreeWalker">
+    <!-- naming.md § Restricted identifiers. Same value as in checkstyle.xml: Checkstyle
+         14's default `format` rejects `var` only. -->
+    <module name="IllegalIdentifierName">
+      <property name="format" value="^(?!(record|yield|var|permits|sealed|when)$|\S*\$)\S+$"/>
+    </module>
+
+    <!-- testing.md § Names and shape: the lambda of a throw assertion makes exactly one
+         call, a method or a constructor. The names below and the ones that rule lists are
+         the same: changing one side without the other is a bug. -->
+    <module name="MatchXpath">
+      <property name="id" value="OneCallInThrowLambda"/>
+      <property name="query" value="//METHOD_CALL[(IDENT | DOT/IDENT)[@text = ('assertThatThrownBy', 'isThrownBy', 'assertThatCode', 'catchThrowable', 'catchThrowableOfType', 'catchException', 'assertThrows', 'assertThrowsExactly')]]/ELIST/LAMBDA[count(.//METHOD_CALL) + count(.//LITERAL_NEW) &gt; 1]"/>
+      <message key="matchxpath.match"
+               value="testing.md § Names and shape: the lambda of a throw assertion makes exactly one call. Build its arguments in the arrange block."/>
+    </module>
+  </module>
+</module>

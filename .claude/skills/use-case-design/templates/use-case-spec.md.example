@@ -1,0 +1,179 @@
+# UC-001 · Create user
+
+> Parent spec. Fixes the boundary and the names; **doesn't** detail any layer.
+> Per-layer detail lives in this folder's partials, each with its own owner.
+
+| Field | Value |
+|---|---|
+| Identifier | `UC-001-create-user` |
+| Date | 2026-09-07 |
+| Trigger | user creation, over HTTP — inbound REST adapter. **The exact path and verb belong to `rest-api-architect`, in `30-rest.md`** |
+| Access | only callers with the `USER_ADMIN` role — a business fact. Mechanism, annotation and status belong to `security-architect`, in `32-seguranca.md`. One of: public · authenticated · role or group (named) · owner (and who may override). Required whenever the trigger is HTTP |
+| Side effects | **1** — `INSERT` into `users` |
+| External calls | none — no side effect reaches a system this service does not own. When one does, one line per system: what it is and what the case asks of it, documentation link, how it authenticates this service (as itself · on behalf of the user · static key · username and password · client certificate · signed requests · none) and who owns the credential, idempotency key accepted or not, tolerance when it is down, and what an unknown write result means. Client, timeout and retry belong to `http-client-architect`, in `28-cliente-http.md` |
+| Transaction | opens at the inbound port, closes before the response |
+| Repetition | repeating the request with the same email must **not** create a second user (business fact). The mechanism — `Idempotency-Key` or none — is delegated to `rest-api-architect` |
+| Concurrency | the `UNIQUE(email)` constraint is the arbiter; no application-level lock |
+| Active blueprint | `hexagonal` |
+
+## Trigger, payload, and response
+
+**In**
+
+| Field | Type | Required | Rule |
+|---|---|---|---|
+| `email` | string | ✅ | valid format, unique in the system |
+| `name` | string | ✅ | 2 to 120 characters |
+| `department` | string | ➖ | one of `Department`'s values |
+
+**Out**
+
+Situations, not statuses. The HTTP code for each is `rest-api-architect`'s decision —
+this spec fixing it was what produced divergence with `30-rest.md`, which then had to
+correct it in prose.
+
+| Situation | Result |
+|---|---|
+| created | reference to the created resource + `id`, `email`, `name` |
+| malformed payload | rejected without touching the domain |
+| email already in use | conflict with existing state |
+
+## Flow
+
+1. The inbound adapter receives the request and validates the payload's **shape**.
+2. Translates it into the domain command `CreateUserCommand`.
+3. The inbound port `CreateUserUseCase` executes: builds the `User` aggregate, which
+   validates its invariants in the constructor.
+4. The outbound port `UserRepository` persists it.
+5. The adapter translates the returned aggregate into the response.
+
+Nothing in this flow names annotations, columns, or framework types — that belongs to
+the partials.
+
+## Components
+
+State: **NEW** to be created · **CHANGE** already exists and changes · **REUSE**
+already exists and serves.
+
+| File | Layer | Role | State | Detailed by |
+|---|---|---|---|---|
+| `adapter/in/rest/UserController.java` | inbound adapter | receives HTTP | NEW | `rest-api-architect` |
+| `adapter/in/rest/dto/CreateUserRequest.java` | inbound adapter | input DTO | NEW | `rest-api-architect` |
+| `adapter/in/rest/dto/UserResponse.java` | inbound adapter | output DTO | NEW | `rest-api-architect` |
+| `adapter/in/rest/UserMapper.java` | inbound adapter | DTO ↔ domain | NEW | `rest-api-architect` |
+| `application/port/in/user/CreateUserUseCase.java` | application | inbound port | NEW | `domain-modeling` |
+| `application/port/in/user/CreateUserCommand.java` | application | command | NEW | `domain-modeling` |
+| `application/service/user/CreateUserService.java` | application | orchestrates, opens transaction | NEW | `domain-modeling` |
+| `application/port/out/UserRepository.java` | application | outbound port | NEW | `domain-modeling` |
+| `domain/model/User.java` | domain | aggregate | NEW | `domain-modeling` |
+| `domain/model/Email.java` | domain | typed field for `email` — value object or `enum`, `domain-modeling` decides | NEW | `domain-modeling` |
+| `domain/model/UserStatus.java` | domain | typed field for `status`, closed set (`ACTIVE`, `BLOCKED`) — value object or `enum`, `domain-modeling` decides | NEW | `domain-modeling` |
+| `adapter/out/persistence/user/UserRepositoryAdapter.java` | outbound adapter | implements the port | NEW | `persistence-architect` |
+| `adapter/out/persistence/user/UserEntity.java` | outbound adapter | persistence entity | NEW | `persistence-architect` |
+| `adapter/out/persistence/user/UserJpaRepository.java` | outbound adapter | Spring Data interface | NEW | `persistence-architect` |
+| `db/migration/V3__create_users.sql` | infrastructure | migration | NEW | `persistence-architect` |
+
+Paths derived from the active blueprint's `packages.map`. If the blueprint changes,
+this table is what gets rewritten — never the flow above. The persistence path carries
+one extra level, the aggregate's own subpackage (`…/persistence/user/`), whatever the
+blueprint calls the layer — `@.claude/rules/persistence.md` § Boundary. The use-case
+paths carry one too, the aggregate the use case writes (`…/port/in/user/`,
+`…/service/user/`, `…/usecase/user/`), whenever the active blueprint's naming convention
+groups use cases by aggregate — that convention owns the rule; a blueprint whose
+convention says nothing about grouping keeps the flat path.
+
+A domain field's row names the field and what it holds; the **shape stays open** — value
+object or `enum` is `domain-modeling`'s call, by `@.claude/rules/value-objects.md`, a rule
+this spec doesn't read. Writing `value object` here for a closed set produces a divergence
+this table guarantees and nobody learns from.
+
+## Invariants
+
+| Rule | Guaranteed by | Who violates it |
+|---|---|---|
+| `email` has a valid format | `Email`'s constructor | caller with an arbitrary string |
+| `email` is unique in the system | `UNIQUE` constraint + check at the outbound port | race between two requests |
+| `name` is 2 to 120 characters | `User`'s constructor | overly long payload |
+
+Invariants live in the aggregate, never in the caller —
+`@.claude/rules/architecture-ddd.md`.
+
+## Errors
+
+| Situation | Kind |
+|---|---|
+| email already in use | conflict with existing state |
+| malformed email | validation |
+| required field missing | shape — rejected in the adapter, never reaches the domain |
+
+Situations and kinds, never exception names or statuses. The exception class and
+`errorCode` belong to `10-dominio.md` (`@.claude/rules/error-handling.md`); the HTTP
+mapping belongs to `30-rest.md` — the use case is transport-agnostic.
+
+## Expected tests
+
+| Level | Target | Detailed by |
+|---|---|---|
+| unit | `User`: rejects invalid email and short name | `test-architect` |
+| unit | use case: propagates the email-in-use conflict | `test-architect` |
+| slice | controller: created, malformed payload, and email in use | `test-architect` |
+| integration | `UserRepositoryAdapter` against a real database | `test-architect` |
+
+## Out of scope for this use case
+
+Written down so nobody merges it back in by accident:
+
+- Sending a welcome email → **UC-002**, reactive to the `UserCreated` event. Out
+  because SMTP isn't transactional with the `INSERT`.
+- Updating and deleting a user → their own use cases, their own triggers.
+- Authentication and token issuance → outside this use case's domain.
+
+## Impact on approved use cases
+
+none — UC-001 is the first case.
+
+Approved specs (`status: approved` or `implemented`) are read-only. When this case needs
+a change in one — a new column, a promoted exception — it's written here instead, one
+row per change, and the executor applies it in code. The old spec is never edited. Each
+partial carries this same section for the changes its owner decides — an exception
+promoted in `10-dominio.md`, a column added in `20-persistencia.md` — and consolidation
+collects them all:
+
+`| Approved case | Change | Why | Satisfied by |` — e.g. `| UC-001-create-user | the `User` aggregate gains a rename operation | this case renames; UC-001 only created | this case |`
+
+The fourth column is only ever empty when the change adds **no** precondition. A row that
+makes an earlier case require a state — a status, a flag, a related record — says which use
+case produces that state: an approved `UC-NNN`, this case itself, or a named backlog case. In
+the last situation the row spells out the consequence, because it is real and temporary:
+`| UC-002-create-account | rejects a customer whose status is not ACTIVE | KYC must pass before
+an account exists | UC-004 (backlog) — until it ships, UC-002 returns 422 on every real call |`.
+
+## Implementation order
+
+Derived from the Components table, in compile order.
+
+- [ ] 1. `domain/model/Email.java`
+- [ ] 2. `domain/model/User.java`
+- [ ] 3. domain exceptions — named in `10-dominio.md`
+- [ ] 4. `application/port/in/user/CreateUserCommand.java`
+- [ ] 5. `application/port/in/user/CreateUserUseCase.java`
+- [ ] 6. `application/port/out/UserRepository.java`
+- [ ] 7. `application/service/user/CreateUserService.java`
+- [ ] 8. `db/migration/V3__create_users.sql`
+- [ ] 9. `adapter/out/persistence/user/` (entity, Spring Data, adapter)
+- [ ] 10. `adapter/in/rest/` (DTOs, mapper, controller)
+- [ ] 11. tests for the levels above
+- [ ] 12. `./mvnw clean verify` green
+
+<!--
+HOW TO USE THIS:
+- Generated by the `use-case-design` skill (step 8) into
+  docs/use-cases/UC-NNN-<slug>/00-caso-de-uso.md
+- This exemplar uses `hexagonal`. With another blueprint, the paths column and the use
+  case class names change — names from the blueprint's naming convention.
+- Fixed sections, in this order. An empty section gets "none" written in — deleting a
+  section hides a question nobody asked.
+- The `Detailed by` column is declarative. The skill invokes nobody.
+- While partials 10- through 40- don't exist yet, this spec stands on its own; the
+  header records their status.
+-->

@@ -1,0 +1,120 @@
+/*
+ * EXEMPLAR — Kafka consumer adapter. Translates an inbound message into a call on the
+ * target use case's inbound port; never touches the target aggregate directly.
+ * Form reference for the executor agent; not a file to copy verbatim.
+ * Rules: `.claude/rules/messaging.md` (idempotent consumer, manual ack, DLQ)
+ *        `.claude/rules/architecture-ddd.md` (Adapters: translate, no business logic)
+ *
+ * WHAT THIS EXEMPLAR SHOWS:
+ *  - dedupe on the event's own identity before calling the use case — a redelivered
+ *    message must not re-run the side effect;
+ *  - manual acknowledgment: the offset only commits after the use case returns
+ *    successfully, never before;
+ *  - a business rejection (typed domain exception) does not retry — it's a poison
+ *    message, route straight to the DLQ instead of exhausting retries first;
+ *  - the listener takes its payload record TYPED, while the record value on the wire is JSON
+ *    text read by `StringDeserializer` (`.claude/rules/messaging.md` § Topics and
+ *    serialization). What turns one into the other is the single
+ *    `StringJacksonJsonMessageConverter` bean below: Boot's Kafka autoconfiguration hands a
+ *    unique `RecordMessageConverter` bean to every `@KafkaListener`, and the target type is
+ *    the method's own parameter — no type header, no trusted-packages list. Text that doesn't
+ *    parse fails conversion, which `DefaultErrorHandler` classifies as not retryable: straight
+ *    to the DLQ, like a business rejection.
+ *
+ * WHAT'S NOT HERE: the DLQ routing and retry backoff themselves — that's
+ * `application-kafka.yml`'s `DefaultErrorHandler`, wired once per consumer group, not
+ * per listener method.
+ *
+ * PACKAGE: one subpackage per event flow — `…messaging.orderconfirmed`,
+ * `…messaging.stockreserved` — never a single flat `…messaging` holding every flow
+ * (`.claude/rules/messaging.md` § Boundary). The unit is the flow, not the aggregate: one
+ * event routinely crosses aggregates, and two events of one aggregate share nothing but their
+ * source. The classes stay package-private, which after the split means one flow cannot see
+ * another's payload: that is the point, and the way across is the port, not a `public`.
+ *
+ * Each `// --- <dir>/<File>.java` block is its own file, at that subpackage.
+ */
+
+// --- ReserveStockUseCase.java (declared by domain-modeling, unrelated to Kafka)
+package com.example.demo.application.port.in.stock;
+
+public interface ReserveStockUseCase {
+
+    void reserve(ReserveStockCommand command);
+}
+
+// --- listener/KafkaListenerConfiguration.java (shared by every flow's listener — declared once)
+package com.example.demo.adapter.in.messaging.listener;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.support.converter.StringJacksonJsonMessageConverter;
+import tools.jackson.databind.json.JsonMapper;
+
+/**
+ * Shared listener wiring, so its own subpackage — not one flow's, and not the adapter root
+ * (`.claude/rules/messaging.md` § Boundary). The `DefaultErrorHandler` +
+ * `DeadLetterPublishingRecoverer` bean belongs in this same class. Exactly one
+ * `RecordMessageConverter` bean in the context: autoconfiguration takes it only `getIfUnique`,
+ * so a second one silently drops both and every listener falls back to the default converter,
+ * which cannot build a typed parameter from JSON text.
+ */
+@Configuration
+class KafkaListenerConfiguration {
+
+    @Bean
+    StringJacksonJsonMessageConverter kafkaRecordMessageConverter(JsonMapper jsonMapper) {
+        return new StringJacksonJsonMessageConverter(jsonMapper);
+    }
+}
+
+// --- orderconfirmed/OrderConfirmedPayload.java (adapter-local — mirrors the producer side's shape)
+package com.example.demo.adapter.in.messaging.orderconfirmed;
+
+import java.time.Instant;
+import java.util.UUID;
+
+public record OrderConfirmedPayload(UUID orderId, UUID customerId, Instant occurredAt) {}
+
+// --- ProcessedEventStore.java (dedupe port — persistence-architect owns the table)
+package com.example.demo.application.port.out;
+
+public interface ProcessedEventStore {
+
+    boolean alreadyProcessed(String eventKey);
+
+    void markProcessed(String eventKey);
+}
+
+// --- orderconfirmed/OrderConfirmedListener.java
+package com.example.demo.adapter.in.messaging.orderconfirmed;
+
+import com.example.demo.application.port.in.stock.ReserveStockUseCase;
+import com.example.demo.application.port.in.stock.ReserveStockCommand;
+import com.example.demo.application.port.out.ProcessedEventStore;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.Acknowledgment;
+
+public class OrderConfirmedListener {
+
+    private final ReserveStockUseCase reserveStock;
+    private final ProcessedEventStore processedEvents;
+
+    public OrderConfirmedListener(ReserveStockUseCase reserveStock, ProcessedEventStore processedEvents) {
+        this.reserveStock = reserveStock;
+        this.processedEvents = processedEvents;
+    }
+
+    @KafkaListener(topics = "orders.order.confirmed", groupId = "inventory-service")
+    public void onMessage(OrderConfirmedPayload payload, Acknowledgment ack) {
+        String eventKey = payload.orderId() + ":OrderConfirmed";
+        if (processedEvents.alreadyProcessed(eventKey)) {
+            ack.acknowledge();
+            return;
+        }
+
+        reserveStock.reserve(new ReserveStockCommand(payload.orderId(), payload.customerId()));
+        processedEvents.markProcessed(eventKey);
+        ack.acknowledge();
+    }
+}

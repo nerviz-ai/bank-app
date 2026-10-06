@@ -1,0 +1,277 @@
+// EXEMPLAR — ArchUnit tests. Lives in the module with `contains_main: true` (bootstrap),
+// in `src/test/java`, because it's the only module that sees every class on the classpath.
+//
+// This is the deterministic half of the enforcement. The `ArchHook.java check` hook blocks
+// in the editor; these rules block in CI and on the machine of whoever isn't using Claude Code.
+//
+// The package names below are `hexagonal` blueprint's. When generating, replace them
+// with the active blueprint's real `packages.map` values — never copy them literally.
+// A blueprint with no `application.port.out` doesn't get the rule that names it.
+//
+// Dependency direction: one rule per line of the blueprint's `dependency_rules.forbidden`.
+// Domain purity mirrors the blueprint's `forbidden_imports`.
+//
+// Masking: the name list in SENSITIVE_NAMES is `.claude/rules/logging.md` § Masking
+// candidates', not this file's — keep the two in step, and add a name here when the rule
+// gains one. Replace the two fully-qualified names in LOG_MASK and MASK_SENSITIVE with this
+// project's own `commons` package (its root `CLAUDE.md` names it).
+package com.exemplo.minhaapi;
+
+import static com.tngtech.archunit.library.GeneralCodingRules.NO_CLASSES_SHOULD_ACCESS_STANDARD_STREAMS;
+import static com.tngtech.archunit.library.GeneralCodingRules.NO_CLASSES_SHOULD_THROW_GENERIC_EXCEPTIONS;
+import static com.tngtech.archunit.library.GeneralCodingRules.NO_CLASSES_SHOULD_USE_FIELD_INJECTION;
+import static com.tngtech.archunit.library.GeneralCodingRules.NO_CLASSES_SHOULD_USE_JAVA_UTIL_LOGGING;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
+
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaField;
+import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.junit.AnalyzeClasses;
+import com.tngtech.archunit.junit.ArchTest;
+import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Locale;
+import java.util.Set;
+
+@AnalyzeClasses(packages = "com.exemplo.minhaapi", importOptions = ImportOption.DoNotIncludeTests.class)
+class ArchitectureTest {
+
+    /** Dependency direction (`.claude/rules/architecture-ddd.md`). */
+    @ArchTest
+    static final ArchRule domain_knows_no_one = noClasses()
+            .that().resideInAPackage("..domain..")
+            .should().dependOnClassesThat()
+            .resideInAnyPackage("..application..", "..adapter..", "..bootstrap..");
+
+    @ArchTest
+    static final ArchRule application_does_not_know_adapters = noClasses()
+            .that().resideInAPackage("..application..")
+            .should().dependOnClassesThat()
+            .resideInAnyPackage("..adapter..", "..bootstrap..");
+
+    @ArchTest
+    static final ArchRule adapters_do_not_talk_to_each_other = SlicesRuleDefinition
+            .slices().matching("..adapter.(*)..")
+            .should().notDependOnEachOther();
+
+    @ArchTest
+    static final ArchRule no_cycles_between_packages = SlicesRuleDefinition
+            .slices().matching("com.exemplo.minhaapi.(*)..")
+            .should().beFreeOfCycles();
+
+    /** Domain purity (`.claude/rules/architecture-ddd.md`). */
+    @ArchTest
+    static final ArchRule domain_has_no_framework = noClasses()
+            .that().resideInAPackage("..domain..")
+            .should().dependOnClassesThat()
+            .resideInAnyPackage("org.springframework..", "jakarta..", "com.fasterxml.jackson..", "tools.jackson..");
+
+    @ArchTest
+    static final ArchRule domain_has_no_system_clock = noClasses()
+            .that().resideInAPackage("..domain..")
+            .should().callMethod(LocalDateTime.class, "now")
+            .orShould().callMethod(LocalDate.class, "now")
+            .orShould().callMethod(Clock.class, "systemDefaultZone")
+            .because("Clock is injected — see rules/architecture-ddd.md");
+
+    /** Composition (`.claude/rules/architecture-ddd.md` § Composition). */
+    @ArchTest
+    static final ArchRule no_field_injection = NO_CLASSES_SHOULD_USE_FIELD_INJECTION;
+
+    @ArchTest
+    static final ArchRule no_service_locator = noClasses()
+            .that().resideOutsideOfPackage("..bootstrap..")
+            .should().dependOnClassesThat()
+            .haveFullyQualifiedName("org.springframework.context.ApplicationContext");
+
+    /** Naming (`.claude/rules/naming.md`). */
+    @ArchTest
+    static final ArchRule no_impl_suffix = noClasses()
+            .should().haveSimpleNameEndingWith("Impl")
+            .because("the name says the role, not that it's the implementation of something");
+
+    /**
+     * `.and().areNotAssignableTo(Record.class)` on the two package-based role rules: a
+     * record is a value carrier — a use case's `*Command`, a port's `*Record` or result —
+     * never a role, and it lives next to the role it serves. ArchUnit imports nested
+     * classes too, so without it a `SendResult` declared inside the port interface fails
+     * "should be interfaces", and a `Command` fails the suffix rule. A plain class out of
+     * pattern still fails both.
+     */
+    @ArchTest
+    static final ArchRule outbound_ports_are_interfaces = classes()
+            .that().resideInAPackage("..application.port.out..")
+            .and().areNotAssignableTo(Record.class)
+            .should().beInterfaces();
+
+    /**
+     * `.and().haveSimpleNameNotEndingWith("package-info")` on every rule below:
+     * `project-bootstrap` generates a `package-info.java` in every package, ArchUnit
+     * imports it as a class, and a naming rule with no exclusion fails on it on the
+     * very first run — the file isn't named `*Service`/`*Controller`/`*Entity` because
+     * it isn't one.
+     */
+    @ArchTest
+    static final ArchRule use_case_implementations = classes()
+            .that().resideInAPackage("..application.service..")
+            .and().haveSimpleNameNotEndingWith("package-info")
+            .and().areNotAssignableTo(Record.class)
+            .should().haveSimpleNameEndingWith("Service");
+
+    @ArchTest
+    static final ArchRule controllers_in_rest_adapter = classes()
+            .that().areAnnotatedWith("org.springframework.web.bind.annotation.RestController")
+            .and().haveSimpleNameNotEndingWith("package-info")
+            .should().resideInAPackage("..adapter.in.rest..")
+            .andShould().haveSimpleNameEndingWith("Controller");
+
+    /**
+     * The trailing two dots are deliberate: the persistence adapter is organized as one
+     * subpackage per aggregate (`@.claude/rules/persistence.md` § Boundary), so the
+     * entity of `User` resides in `..adapter.out.persistence.user`. Narrowing this to a
+     * single-level glob would fail every project that follows the rule.
+     */
+    @ArchTest
+    static final ArchRule jpa_entities_have_entity_suffix = classes()
+            .that().areAnnotatedWith("jakarta.persistence.Entity")
+            .and().haveSimpleNameNotEndingWith("package-info")
+            .should().haveSimpleNameEndingWith("Entity")
+            .andShould().resideInAPackage("..adapter.out.persistence..");
+
+    /**
+     * Persistence mapping (`.claude/rules/persistence.md`). Both bugs the two rules below
+     * catch pass compilation and most tests: the first degrades {@code save()} to
+     * {@code merge()} and swallows primary-key collisions, the second only fails at context
+     * startup.
+     */
+    private static final DescribedPredicate<JavaClass> HAVE_ASSIGNED_ID = DescribedPredicate.describe(
+            "have an @Id without @GeneratedValue",
+            javaClass -> javaClass.getAllFields().stream().anyMatch(field ->
+                    field.isAnnotatedWith("jakarta.persistence.Id")
+                            && !field.isAnnotatedWith("jakarta.persistence.GeneratedValue")));
+
+    /** Empty is allowed: a project whose ids are all generated has nothing to check. */
+    @ArchTest
+    static final ArchRule assigned_ids_implement_persistable = classes()
+            .that().areAnnotatedWith("jakarta.persistence.Entity")
+            .and(HAVE_ASSIGNED_ID)
+            .should().implement("org.springframework.data.domain.Persistable")
+            .because("without isNew, Spring Data merges instead of persisting (§ Identity and keys)")
+            .allowEmptyShould(true);
+
+    /**
+     * Postgres only: `@Lob String` maps to `oid`, not `text`. Drop this rule when the
+     * blueprint's database is another engine. Empty is the expected state: no {@code @Lob}
+     * field at all.
+     */
+    @ArchTest
+    static final ArchRule no_lob_on_string = noFields()
+            .that().areAnnotatedWith("jakarta.persistence.Lob")
+            .should().haveRawType(String.class)
+            .because("a bare String already maps to text (§ Mapping)")
+            .allowEmptyShould(true);
+
+    /** Code quality (`.claude/rules/code-quality.md`). */
+    @ArchTest
+    static final ArchRule no_generic_exceptions = NO_CLASSES_SHOULD_THROW_GENERIC_EXCEPTIONS;
+
+    @ArchTest
+    static final ArchRule private_final_fields_in_domain = fields()
+            .that().areDeclaredInClassesThat().resideInAPackage("..domain..")
+            .and().areNotStatic()
+            .should().bePrivate()
+            .andShould().beFinal()
+            .because("value objects and aggregates are immutable");
+
+    @ArchTest
+    static final ArchRule no_java_util_logging = NO_CLASSES_SHOULD_USE_JAVA_UTIL_LOGGING;
+
+    @ArchTest
+    static final ArchRule no_system_out = NO_CLASSES_SHOULD_ACCESS_STANDARD_STREAMS;
+
+    /**
+     * Masking (`.claude/rules/logging.md` § Masking candidates). The global REST aspect logs
+     * request and response DTOs BY DEFAULT, opt-out. So a DTO that carries personal data and
+     * does not implement the masking interface leaks it the moment the endpoint runs — which
+     * is how a {@code String securityNumber} holding a CPF crossed design, implementation,
+     * review and a green build in a real project. The type half of the derivation needs no
+     * list: a field whose raw type is one of the catalog's personal-data value objects
+     * matches by type.
+     */
+    private static final Set<String> SENSITIVE_NAMES = Set.of(
+            "cpf", "cnpj", "rg", "ssn", "taxid", "nationalid", "securitynumber", "socialsecurity",
+            "document", "documento", "documentnumber", "passport", "driverlicense",
+            "email", "phone", "telefone", "celular", "mobile", "whatsapp",
+            "address", "endereco", "street", "logradouro", "zipcode", "cep", "postalcode",
+            "birthdate", "datanascimento", "dateofbirth",
+            "card", "cardnumber", "cvv", "cvc", "iban", "pix", "accountnumber", "agency",
+            "password", "senha", "secret", "token", "apikey", "accesskey", "privatekey");
+
+    private static final String LOG_MASK = "com.exemplo.minhaapi.commons.logging.LogMask";
+    private static final String MASK_SENSITIVE = "com.exemplo.minhaapi.commons.logging.MaskSensitiveData";
+
+    /**
+     * The guard, and it has to be on the `that()` side. `should().implement("...")` against
+     * an interface that is not on the classpath FAILS for every matched class — it does not
+     * skip — so `allowEmptyShould` alone would turn "commons not installed" into a red
+     * build. Matching nothing is what makes the rule vacuous.
+     */
+    private static final boolean COMMONS_INSTALLED = isOnClasspath(LOG_MASK);
+
+    private static boolean isOnClasspath(String fqn) {
+        try { Class.forName(fqn, false, ArchitectureTest.class.getClassLoader()); return true; }
+        catch (ClassNotFoundException e) { return false; }
+    }
+
+    private static final Set<String> SENSITIVE_TYPES =
+            Set.of("Email", "PhoneNumber", "Cpf", "Cnpj", "Document");
+
+    private static final DescribedPredicate<JavaField> SENSITIVE_FIELD = DescribedPredicate.describe(
+            "be derived as sensitive by name or by type",
+            field -> {
+                if (!COMMONS_INSTALLED) return false;
+                String name = field.getName().toLowerCase(Locale.ROOT);
+                return SENSITIVE_NAMES.stream().anyMatch(name::contains)
+                        || SENSITIVE_TYPES.contains(field.getRawType().getSimpleName());
+            });
+
+    private static final DescribedPredicate<JavaClass> CARRY_SENSITIVE_DATA = DescribedPredicate.describe(
+            "carry a field the masking rule derives as sensitive",
+            javaClass -> javaClass.getAllFields().stream().anyMatch(SENSITIVE_FIELD));
+
+    /**
+     * Guarded: {@code commons} is installed on demand, not at bootstrap. Where the masking
+     * interface does not exist on the classpath the predicate matches nothing and
+     * {@code allowEmptyShould(true)} keeps the rule vacuous instead of failing a project that
+     * never installed it — or one with no sensitive DTO.
+     */
+    @ArchTest
+    static final ArchRule sensitive_dtos_implement_log_mask = classes()
+            .that().resideInAPackage("..adapter.in.rest.dto..")
+            .and(CARRY_SENSITIVE_DATA)
+            .should().implement(LOG_MASK)
+            .because("the REST aspect logs every DTO by default; an unmasked one leaks the field"
+                    + " (@.claude/rules/logging.md § Masking candidates)")
+            .allowEmptyShould(true);
+
+    /**
+     * The interface alone gives a masked `toString()` only for the fields that say which
+     * pattern to use. A class that implements it and marks nothing masks nothing.
+     */
+    @ArchTest
+    static final ArchRule sensitive_fields_are_marked = fields()
+            .that().areDeclaredInClassesThat().resideInAPackage("..adapter.in.rest.dto..")
+            .and().areDeclaredInClassesThat().implement(LOG_MASK)
+            .and(SENSITIVE_FIELD)
+            .should().beAnnotatedWith(MASK_SENSITIVE)
+            .because("masking is per field, and the default is to mask"
+                    + " (@.claude/rules/logging.md § Masking candidates)")
+            .allowEmptyShould(true);
+}

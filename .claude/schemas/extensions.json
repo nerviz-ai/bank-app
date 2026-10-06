@@ -1,0 +1,556 @@
+{
+  "$comment": "Single owner of the frontmatter fields recognized by the Claude Code runtime. Read by .claude/hooks/ArchHook.java in `schema` mode. Add a field HERE, never in the Java. ",
+
+  "forbidden_everywhere": ["metadata"],
+
+  "types": {
+    "skill": {
+      "match": ".claude/skills/*/SKILL.md",
+      "case": "kebab",
+      "native_commands": [
+        "add-dir", "agents", "bug", "clear", "compact", "config", "context", "cost",
+        "doctor", "effort", "exit", "export", "fast", "feedback", "help", "hooks", "ide",
+        "init", "install-github-app", "login", "logout", "mcp", "memory", "model",
+        "output-style", "permissions", "plugin", "pr-comments", "privacy-settings",
+        "release-notes", "resume", "review", "rewind", "sandbox", "security-review",
+        "skills", "status", "statusline", "terminal-setup", "todos", "upgrade", "usage", "vim"
+      ],
+      "required": ["name", "description"],
+      "allowed": [
+        "name",
+        "description",
+        "when_to_use",
+        "argument-hint",
+        "arguments",
+        "disable-model-invocation",
+        "user-invocable",
+        "allowed-tools",
+        "disallowed-tools",
+        "model",
+        "effort",
+        "paths",
+        "context",
+        "agent",
+        "background",
+        "hooks",
+        "shell"
+      ]
+    },
+
+    "agent": {
+      "match": ".claude/agents/*.md",
+      "case": "camel",
+      "required": ["name", "description"],
+      "allowed": [
+        "name",
+        "description",
+        "tools",
+        "disallowedTools",
+        "model",
+        "permissionMode",
+        "maxTurns",
+        "skills",
+        "mcpServers",
+        "hooks",
+        "memory",
+        "background",
+        "effort",
+        "isolation",
+        "color",
+        "omitClaudeMd",
+        "initialPrompt",
+        "experimental"
+      ]
+    },
+
+    "rule": {
+      "match": ".claude/rules/*.md",
+      "required": ["status", "paths"],
+      "allowed": ["paths", "status"],
+      "enum": {
+        "status": ["active", "draft", "deprecated"]
+      }
+    }
+  },
+
+  "injections": {
+    "$comment": "Read by ArchHook.java `schema`, applied to every file that mode already visits. A `!`command`` injection runs in the session's persistent shell, at whatever cwd it holds: a `cd` in an earlier Bash call makes a relative `test -f` report a file as absent while it exists, and an injected state that lies fires the entry guard of the skill it belongs to. Requiring the substring below is deliberately blunt — an injection that touches no path at all is also flagged, because `ls -a | head -30` was one of the twelve real occurrences and names no path either. Scope and escapes, each one a false positive the first run produced: only files a `types` match captures are scanned (a decision record or a lessons-learned is prose about injections, and `schema` is handed one on every Edit under .claude/); a fenced code block is dropped; and so is a double-backtick span, which is how markdown has to quote an injection when documenting it. `exempt_patterns` is the escape hatch, one regex per genuinely cwd-independent injection; it is empty on purpose, and an entry added to it needs a reason in the commit. Why this is a hook and not a review item: CLAUDE.md invariant 6. ",
+    "require": "${CLAUDE_PROJECT_DIR",
+    "exempt_patterns": []
+  },
+
+  "arguments": {
+    "$comment": "Read by ArchHook.java `schema`, same scope and same two escapes as `injections` above. The runtime interpolates the marker at EVERY occurrence, not only at the interpolation point, so a sentence that talks about the argument arrives with the real value inside it: lessons-learned-012 § 2 caught `/new-feature` telling the model to invoke test-architect `with empty $ARGUMENTS (setup mode)` and the model reading `with empty UC-003-initiate-kyc-verification (setup mode)` — setup mode named by the argument that means design mode. Seven occurrences across six skills, every one of them a sentence about the argument. `requires_field` limits the check to a file that actually receives one; `interpolation_line` is the single allowed shape, a line holding nothing but the marker; `exempt_patterns` is the escape hatch, one regex per line, empty on purpose. Why a hook and not a review item: CLAUDE.md invariant 6 — the defect is invisible in the source and only appears in what the model receives. ",
+    "marker": "$ARGUMENTS",
+    "requires_field": "argument-hint",
+    "interpolation_line": "^[ \\t]*\\$ARGUMENTS[ \\t]*$",
+    "exempt_patterns": []
+  },
+
+  "doctor": {
+    "$comment": "Read by ArchHook.java `doctor`. `uc_references` sweeps the versioned files for a citation of a `docs/use-cases/UC-NNN-slug/` folder that no longer exists on disk: deleting or renaming a use case folder leaves its citations behind, and each one was correct in the commit that wrote it, so nothing else ever revisits them — lessons-learned-012 § 14 found a `docker-compose.yml` comment pointing at the `25-mensageria.md` of a folder deleted in the run before. Reported, never blocking: a stale citation is a documentation defect and `doctor` is where a person is already reading. Group 1 of `pattern` is the folder path. `root` gates the whole sweep: where that directory does not exist there are no use cases to be stale against, which is the case in this meta-repository — the check belongs to the generated project. `extensions` keeps the sweep off binaries and lockfiles; `exempt_paths` is a prefix match for files that name a folder as illustration rather than reference — a skill body, an agent, a decision record, a lessons-learned.",
+    "uc_references": {
+      "root": "docs/use-cases",
+      "pattern": "(docs/use-cases/UC-[0-9]{3}-[a-z0-9]+(?:-[a-z0-9]+)*)",
+      "extensions": [".md", ".yml", ".yaml", ".java", ".json", ".xml", ".sql", ".txt"],
+      "$comment_exempt": "Prefixes, matched with startsWith, and written WITHOUT a trailing slash on purpose: a directory prefix spelled with one IS an export residue marker, so this file would report itself as carrying a dead citation on every run. These paths are data, not citations.",
+      "exempt_paths": [".claude/decisions", ".claude/lessons-learned", ".claude/skills", ".claude/agents", "docs/lessons-learned"]
+    },
+
+    "$comment_bl": "bl_references is uc_references' twin, for the backlog's own identifier. A BL-NN is what an impact row cites when the use case that satisfies a precondition has not been designed yet: BACKLOG.md deliberately reserves no UC number, so before this identifier existed the `Satisfied by` gate was unsatisfiable whenever the satisfier was in the backlog, and two reports of one run invented `UC-004` to fill the sentence (lessons-learned-014 § 7). The citation has to keep resolving after the case IS designed, since the spec carrying it is immutable once approved — which is why BACKLOG.md keeps a `## Retired` table and this check accepts a hit in either one: `resolves_in` is the file, and a BL-NN present anywhere in it counts. Reported, never blocking, like its twin, and `root` gates the whole sweep, so it is silent in this meta-repository. ",
+    "bl_references": {
+      "root": "docs/use-cases",
+      "resolves_in": "docs/use-cases/BACKLOG.md",
+      "pattern": "\\b(BL-[0-9]{2,3})\\b",
+      "extensions": [".md", ".yml", ".yaml", ".java", ".json", ".xml", ".sql", ".txt"],
+      "exempt_paths": [".claude/decisions", ".claude/lessons-learned", ".claude/skills", ".claude/agents", "docs/lessons-learned"]
+    }
+  },
+
+  "settings": {
+    "$comment": "Single owner of what a hook registration may contain. Read by ArchHook.java `schema`, which is also what writes the errors — the runtime itself accepts an unknown event name, a `matcher` on an event that ignores it, and a `type` it has no handler for, all without a word. `match` is a list for the same reason `mcp.match` is: the generated project's hooks live in project-bootstrap's template, and a typo there only surfaces after the project exists. `hook_events` is transcribed from claude-help.md § 8, which ends in \"among others\" — an incomplete list here would block a legitimate event, so `hook_events_extra` is the escape hatch, one event name per entry, and an entry added to it needs a reason in the commit (same discipline as `injections.exempt_patterns`). `matcher_events` holds the events that actually read a `matcher`; on the rest it is dead configuration that reads as a filter. `entry_types` is repo policy, not a runtime limit: the runtime also serves http/mcp/prompt/agent hooks, and this repo runs commands only. `command_forbidden_chars` enforces exec form — a metacharacter in `command` means a shell string was written where the executable goes, and it silently becomes an argument. ",
+    "match": [
+      ".claude/settings.json",
+      ".claude/skills/project-bootstrap/templates/settings.json.example"
+    ],
+    "hook_events": [
+      "SessionStart", "SessionEnd", "UserPromptSubmit", "Stop", "StopFailure",
+      "PreToolUse", "PostToolUse", "PostToolUseFailure", "PostToolBatch",
+      "PermissionRequest", "PermissionDenied", "SubagentStart", "SubagentStop",
+      "PreCompact", "PostCompact", "Notification", "FileChanged",
+      "InstructionsLoaded", "TaskCreated", "TaskCompleted", "WorktreeCreate",
+      "ConfigChange", "CwdChanged"
+    ],
+    "hook_events_extra": [],
+    "matcher_events": [
+      "PreToolUse", "PostToolUse", "PostToolUseFailure", "PostToolBatch",
+      "PermissionRequest", "PermissionDenied", "SubagentStart", "SubagentStop",
+      "PreCompact", "PostCompact", "Notification"
+    ],
+    "group_allowed": ["matcher", "hooks"],
+    "entry_types": ["command"],
+    "command_forbidden_chars": ["|", "&", ";", ">", "<", "`", "$("],
+    "hook_entry": {
+      "required": ["type", "command"],
+      "allowed": ["type", "command", "args", "timeout", "statusMessage", "if"]
+    },
+    "allowed": [
+      "$schema", "_comment", "hooks", "permissions", "enabledPlugins",
+      "enabledMcpjsonServers", "disabledMcpjsonServers", "enableAllProjectMcpServers",
+      "allowedMcpServers", "deniedMcpServers"
+    ]
+  },
+
+  "audit": {
+    "$comment": "Read by ArchHook.java `audit` mode. The audited set is not listed here: any name that resolves to .claude/skills/<n>/SKILL.md or .claude/agents/<n>.md is recorded, invoked by `/command` or by the model's own Skill/Agent call. Not frontmatter: it lives here because this file is the single owner of every list the hook reads. `redact` runs before the initial prompt, and the first line of each tool error, are written into the versioned .claude/audit-usage/ report — each `patterns` entry MUST expose the key part as group 1, the replacement keeps $1 and blanks the rest. Which pieces are NOT recorded is not listed here either: a class in `skill_classes` or `agent_classes` that declares `audited: false` leaves no report for any piece it lists — today `observer` (`audit-usage` reads the trail, `arch-doctor` reads the setup) and `ops` (`git-publish`: its own report would land after its commit). Three levels decide it, first boolean wins: a piece's own `overrides.<name>.audited` in its class, fixed here and out of the project's reach (`arch-adopt`, never audited); then the project's `project_overrides` file; then the class flag. ",
+    "$comment_project_overrides": "Resolved inside the trail directory, like pricing.json. The one file of `.claude/` a generated project writes for itself: `export` never names it, so `/arch-adopt` never touches it. Shape: {\"skills\": {\"<name>\": true|false}, \"agents\": {\"<name>\": true|false}} — `false` takes a piece out of the trail with the semantics of `audited: false`, `true` puts back one its class leaves out. Absent file or absent name: the class decides, as before. `doctor` validates it strictly — any other key, a non-boolean, a name with no file, or a piece fixed by its class override fails by name: the file sets which pieces are audited and nothing else. ",
+    "project_overrides": "audited.json",
+    "$comment_harness_prompts": "Prompts the harness injects on its own while a background agent's run is open — matched with find(), each one a regex. Not user intent: `audit prompt` neither closes, nor opens, nor overwrites the observer file on them, so the run keeps absorbing the agent's remaining events. `<task-notification>` is the agent's completion notice (decision 0041); `<agent-message` is its report, delivered through the runtime's one-shot hand-back (decision 0119). Both are undocumented runtime formats: a renamed shape closes runs early again, in silence — AuditRenderTest pins both.",
+    "harness_prompts": ["^\\s*<task-notification>", "^\\s*<agent-message\\b"],
+    "$comment_genesis": "Read by `audit genesis <project> <session-id>`, which `/init-project` runs after `project-initializer` returns and before `git-publish`. `file` is the generated project's genesis record, relative to its root; `command` the skill whose `<command-name>` message marks Started in this session's transcript; `placeholders` the four literals step 8.6 of project-bootstrap leaves in the file and this mode replaces — Started, Finished (the moment it runs), the tokens of the main transcript and every subagent transcript from Started on, and their cost from the project's pricing.json. The model never writes those four values. ",
+    "genesis": {
+      "file": ".claude/audit-usage/GENESIS.md",
+      "command": "init-project",
+      "placeholders": {"started": "{{startIso}}", "finished": "{{endIso}}", "tokens": "{{tokens}}", "cost": "{{cost}}"}
+    },
+    "redact": {
+      "patterns": [
+        "(?i)((?:authorization|token|api[_-]?key|secret|password|passwd|pwd)\\s*[:=]\\s*)\\S+",
+        "(?i)(--(?:token|password|api-key)[ =])\\S+",
+        "()-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----"
+      ],
+      "value_prefixes": ["Bearer ", "ghp_", "github_pat_", "sk-", "xoxb-", "AKIA"]
+    }
+  },
+
+  "tests": {
+    "$comment": "Read by ArchHook.java `tests`. `tests agent-start` (SubagentStart) and `tests agent-end` (SubagentStop), registered only in project-bootstrap/templates/settings.json.example, keep one marker per `agent_id` for every agent whose class in `agent_classes` has `executor: true`; the `Stop` gate defers, exit 0 with one stderr line, while a marker younger than `writer_agent_max_minutes` exists. A background executor's Stop otherwise ran Maven over its half-written tree and blocked a main thread that cannot write src/ (issue #76). The cap is what an agent killed by machine sleep, which never reaches SubagentStop, costs: past it the marker is deleted and the gate runs again. ",
+    "writer_agent_max_minutes": 120
+  },
+
+  "skill_classes": {
+    "$comment": "Single owner of what class each skill belongs to, what shape its body has, and what it is allowed to write. Read by ArchHook.java in two modes: `schema` validates the body of every .claude/skills/*/SKILL.md, `guard` enforces `write_allow` at PreToolUse. The class is the standardization unit the bodies never had: nine skills said `## Contract`, project-bootstrap said `## Skill contract`, and arch-doctor and init-project said nothing at all, with `claude plugin validate` printing `✔ Validation passed` over all of it. Coverage is total by design — a skill on disk that no class lists is the bug, and `schema` says so by name, the same discipline `export.skills.include`/`exclude` already uses. `write_allow` is a class DEFAULT and `overrides.<skill>.write_allow` replaces it: `build` holds four skills whose real territories differ by an order of magnitude (project-bootstrap writes the whole tree, gof-design-patterns writes one Java class), so the class groups their STRUCTURE and only defaults their TERRITORY. An empty list is a decision, not an omission — an observer that writes is a bug, and `ops`'s effect is `git` over Bash, which the guard does not cover. `required_sections` is matched as a PREFIX of an H2 line, which is what lets `## Procedure — design mode` satisfy `## Procedure`; order is not checked, because order changes nothing the model obeys and a reorder would become a blocking change. `design_phase` marks the classes whose open phase restricts writes; `blocked_during_design` marks the classes a Skill call cannot reach from inside one — that pair is what makes the pipeline docs-only in the mechanism instead of in prose. ",
+    "match": ".claude/skills/*/SKILL.md",
+    "class_marker": "**Class:**",
+    "universal_sections": ["## Contract"],
+    "why_section": "(?m)^##\\s+Why\\b",
+    "$comment_bash": "`unfiltered_bash_marker`: a skill whose allowed-tools pre-approves bare `Bash` must carry this marker in its body with the reason — otherwise `schema` fails by name. Scoped entries (`Bash(ls *)`) need nothing. Thirteen skills pre-approved every shell command for their whole turn, git-publish included (lessons-learned-015 § F). The four that keep bare Bash run builds, network and docker by design; force push is refused for them by `guard.force_push`, in-repo writes by `guard bash` and `guard sweep`. ",
+    "unfiltered_bash_marker": "**Unfiltered Bash:**",
+    "$comment_model": "`universal_fields`: frontmatter fields every skill must declare; `allowed_models` per class: the values `model` may take there. An absent `model` is a silent default — the skill runs on the session's model — the same failure shape as an unknown field (invariant 10). A skill's `model` holds for the rest of the turn, which is why a pin that LOWERS the model on a skill fired mid-turn is a known risk, not an agent: an agent is warranted only when the model must stay inside that work. `haiku` is in no set. `effort` stays optional. ",
+    "universal_fields": ["model"],
+    "classes": {
+      "design": {
+        "$comment": "Emits one partial of one use case folder and nothing else. Nine skills, one shape.",
+        "design_phase": true,
+        "allowed_models": ["opus"],
+        "write_allow": ["docs/use-cases/UC-*/**", "docs/use-cases/BACKLOG.md"],
+        "required_sections": ["## Target", "## How it's invoked", "## Procedure"],
+        "skills": [
+          "use-case-design", "domain-modeling", "persistence-architect",
+          "rest-api-architect", "security-architect", "http-client-architect", "messaging-architect",
+          "jobs-architect", "test-architect"
+        ]
+      },
+      "orchestrator": {
+        "$comment": "Chains other skills and owns the consolidated artifact. init-project overrides to an empty territory: everything it does is delegated to the project-initializer agent, which the guard bypasses as an executor.",
+        "design_phase": true,
+        "allowed_models": ["opus", "sonnet"],
+        "write_allow": ["docs/use-cases/**", "docs/lessons-learned/**"],
+        "required_sections": ["## Procedure"],
+        "skills": ["new-feature", "init-project"],
+        "overrides": {
+          "init-project": { "write_allow": [] }
+        }
+      },
+      "build": {
+        "$comment": "Materializes files outside docs/. No common territory — the class default is empty on purpose and every skill carries its own override, which is the honest shape of a class that holds project-bootstrap and gof-design-patterns at once. Unreachable by a Skill call while a design_phase class is open: a design run's diff stays reviewable as docs. `arch-adopt` carries `audited: false` in its override, the only piece-level flag: never audited, and a project's `audit.project_overrides` file cannot turn it back on. Its whole output is a `git diff` of `.claude/` handed to the user for review — its own report would land in that diff after the export, and its step 1 refuses a dirty tree. ",
+        "blocked_during_design": true,
+        "allowed_models": ["opus", "sonnet"],
+        "write_allow": [],
+        "required_sections": ["## Procedure"],
+        "skills": ["project-bootstrap", "docker-architect", "arch-adopt", "gof-design-patterns", "sonarqube-setup", "transport-security-setup"],
+        "overrides": {
+          "project-bootstrap": { "write_allow": ["**"] },
+          "docker-architect": { "write_allow": ["docker-compose*.yml", "docker/**", "Dockerfile", ".env", ".env.example", ".gitignore", ".dockerignore"] },
+          "arch-adopt": { "write_allow": [".claude/**", ".gitignore", "CLAUDE.md"], "audited": false },
+          "gof-design-patterns": { "write_allow": ["src/**", "**/src/**"] },
+          "sonarqube-setup": { "write_allow": ["pom.xml", "build.gradle", ".github/workflows/**"] },
+          "transport-security-setup": {
+            "$comment": "The transport configuration, the HSTS filter and the two transport ITs, and the `**Transport:**` paragraph of the root CLAUDE.md. `src/test/**` whole, not the two IT names: with TLS on by default a `@SpringBootTest` that runs without the `test` profile can no longer start, and the setup adds the profile to each one it finds. Every path twice, rooted and under `**/`, for the multi-module layouts. ",
+            "write_allow": [
+              "src/main/resources/application*.yml", "**/src/main/resources/application*.yml",
+              "src/main/java/**/HstsHeaderFilter.java", "**/src/main/java/**/HstsHeaderFilter.java",
+              "src/test/**", "**/src/test/**",
+              "CLAUDE.md"
+            ]
+          }
+        }
+      },
+      "observer": {
+        "$comment": "Reads the setup or the trail and writes nothing. The reports under .claude/audit-usage/ are written by the `audit` hook, not by the skill that reads them. `audited: false` is what keeps an observer out of that trail: invoking one closes the run in progress and opens none of its own — so a report read mid-session is finished rather than stuck at `⏳ in progress`, and reading the trail never appends a report about reading it. The flag is read per class by ArchHook.java `isAuditExcluded`, for `agent_classes` too; absent means audited. A skill added to this class inherits it, which is the point: this list used to be repeated in `audit.exclude_skills`, and two lists of the same two names drift apart in silence. ",
+        "audited": false,
+        "allowed_models": ["sonnet"],
+        "write_allow": [],
+        "required_sections": [],
+        "skills": ["arch-doctor", "audit-usage"]
+      },
+      "meta": {
+        "$comment": "Writes the extensions themselves. The only class whose territory is .claude/ — and the reason the guard is registered in this meta-repository at all. `docs/**` and `.github/**` are in the list because they are DERIVED from the extensions: a change to a hook mode or a class rewrites docs/pt-br/08-audit-usage.md and its English twin, and a new enforcement adds a step to the workflow that runs it. Leaving them out would block the propagation step of the very skill this class holds, which is what the first run of this block did.",
+        "allowed_models": ["opus"],
+        "write_allow": [
+          ".claude/**", "CLAUDE.md", ".mcp.json", "MCP-SETUP.md",
+          "docs/**", ".github/**"
+        ],
+        "required_sections": ["## Procedure", "## Out of scope"],
+        "skills": ["claude-code-architect-designer"]
+      },
+      "ops": {
+        "$comment": "Effect outside the working tree. Writes no file, so an empty write_allow is exact rather than restrictive. `audited: false`: a run of its own would render its report at the `Stop` AFTER the commit it made, so every publish left the tree dirty with a report about publishing (lessons-learned-012 § 15). Typed as `/git-publish` it now closes the run in progress first — that run's report and ledger lines land on disk before the commit, and go into it. Chained inside another run it stays part of that run, with its own tokens, like any nested piece. Design: `triage-issue` has the same shape — its effect is a comment on an issue, outside the tree, and it writes no file; the judgment that would otherwise argue for `opus` lives in the `issue-verifier` agent it delegates to. ",
+        "audited": false,
+        "allowed_models": ["sonnet"],
+        "write_allow": [],
+        "required_sections": ["## Procedure", "## Failure modes"],
+        "skills": ["git-publish", "triage-issue"]
+      },
+      "report": {
+        "$comment": "Runs an analyzer over the project, writes one findings file under docs/lessons-learned/, and — behind a confirmation — publishes a sanitized copy outside the working tree. Not `build`, whose reason to exist is materializing files outside docs/, and not `ops`, which writes no file and allows sonnet only while this class's tracing step is judgment. `## Failure modes` is required because every run depends on two external systems — the analyzer's server and the forge the issue goes to — and each one fails in a way the reader must be told how to leave. Blocked during design: a run is a full build. The territory is the class default on purpose, so a second report skill joins by name, with no override. Design: `report-issue` is that second skill: the one door from a generated project to the meta-repository, so sonar-lessons now writes its findings file and prints the command instead of publishing — one owner of the privacy rule and the duplicate search. ",
+        "blocked_during_design": true,
+        "allowed_models": ["opus"],
+        "write_allow": ["docs/lessons-learned/**"],
+        "required_sections": ["## Procedure", "## Failure modes"],
+        "skills": ["sonar-lessons", "report-issue"]
+      }
+    }
+  },
+
+  "agent_classes": {
+    "$comment": "Single owner of what class each agent belongs to, what shape its body has, which frontmatter fields it must declare, and what it is allowed to write. The agent-side twin of `skill_classes` above, read by the same two modes: `schema` validates every .claude/agents/*.md, `guard` enforces `write_allow`. It is also the single owner of WHICH AGENTS EXECUTE — `executor: true` replaces the hand-written `guard.executor_agents` list that used to live below, and `schema` still cross-checks it against each file's own `**Executor:** yes` marker in both directions. Territory is keyed on `agent_type`, which the PreToolUse payload of a subagent's write already carries — the field the old unconditional bypass read. That is why an agent's territory needs no phase file, no SubagentStop bookkeeping, and is immune by construction to the two-hook ordering race of lessons-learned-006 § 1: there is nothing to order, the payload names the agent on every single write. Before this block the four agents each documented a prose `**Writes:**`/`**Does not write:**` contract — archunit-installer promising not to touch docker-compose.yml, commons-logging-installer promising to stay inside its own package — and the guard granted all four an unconditional bypass, so none of those promises was enforced by anything. `required_sections` is prefix-matched against H2 lines, exactly as in `skill_classes`, which is what lets `## Input validation (guardrail)` satisfy `## Input validation` and `## Procedure — 4 fixed blocks + 1 conditional` satisfy `## Procedure`. `overrides.<agent>.write_allow` REPLACES the class default: `installer` holds two agents that share a shape and not a territory, so the class default is their intersection (the POMs) and each override states its full territory. commons-logging-installer's package is blueprint-dependent (`commons.logging` here, `shared.logging` in modular-monolith), so its glob matches on the leaf segment instead of on a package name no blueprint guarantees. Design: `pattern_catalog` (class default, overridable per agent like `write_allow`) decides whether `ArchHook.java context subagent` hands the agent the design-pattern catalog at SubagentStart; `schema` fails an agent whose effective `write_allow` reaches `src/` without one, and cross-checks the body's `pattern_catalog_marker` line against the value in both directions — a decision recorded in the meta-repository",
+    "match": ".claude/agents/*.md",
+    "class_marker": "**Class:**",
+    "executor_marker": "**Executor:** yes",
+    "pattern_catalog_marker": "**Pattern catalog:**",
+    "require_h1": true,
+    "universal_sections": ["## Contract", "## Procedure"],
+    "universal_fields": ["model", "tools"],
+    "forbidden_values": { "permissionMode": ["bypassPermissions"] },
+    "why_section": "(?m)^##\\s+Why\\b",
+    "classes": {
+      "driver": {
+        "$comment": "Receives the interview's answers from `/init-project` — which runs it in the main session, since a background agent has no AskUserQuestion (decision 0123) — and delegates the procedure to a skill; writes the whole tree of a project that does not exist yet, which is why its territory is everything and `init-project`'s own is empty on purpose. No `effort`: the reason this class exists is `model: opus`, and an effort level on top of it was never the decision. Does not travel — export.agents.exclude. `pattern_catalog: false`: it writes through project-bootstrap's templates, it designs no Java of its own.",
+        "executor": true,
+        "pattern_catalog": false,
+        "write_allow": ["**"],
+        "required_sections": ["## Interview"],
+        "agents": ["project-initializer"]
+      },
+      "executor": {
+        "$comment": "Implements an approved spec: the spec replaces the interview, so the body carries an input guardrail instead of questions. The one path outside src/ is the single Edit that closes `status: approved` to `status: implemented` — the frozen-folder check in `guard` allows that line and only that line, and the allowlist has to let the file through before that check is even reached. `pom.xml` is here since lessons-learned-013 § 10: Form B needed `spring-kafka`, no participant in the feature pipeline owned the file (the design skills are docs-only, `/new-feature` writes the spec, the two installers have nothing to do with a feature's dependencies) and the run unblocked only because a human edited it outside every territory. The territory is file-level and cannot say `dependency blocks only` — what bounds it is the agent's own body: a dependency the spec's § 3 or § 6 names as a declared requirement, nothing else, and any other change to the file is reported instead of written. `pattern_catalog: true`: this is the agent that designs the feature's Java, and the catalog has to be in its context before the first class is written, not after the second occurrence of a symptom.",
+        "executor": true,
+        "pattern_catalog": true,
+        "required_fields": ["effort"],
+        "write_allow": ["src/**", "**/src/**", "docs/use-cases/UC-*/UC-*-spec.md", "pom.xml", "**/pom.xml"],
+        "required_sections": ["## Input validation", "## Failure mode", "## References"],
+        "agents": ["java-spring-boot-developer"]
+      },
+      "installer": {
+        "$comment": "One-shot mechanical setup with no interview, returning a structured summary. The class default is the intersection of its two agents' territories — the POMs, which both edit — and each agent replaces it with its own full list. `pattern_catalog: false`: both write Java under src/, but copy fixed templates — nothing they write is designed, so a catalog would only cost context.",
+        "executor": true,
+        "pattern_catalog": false,
+        "required_fields": ["effort"],
+        "write_allow": ["pom.xml", "**/pom.xml"],
+        "required_sections": ["## Failure mode", "## Summary format", "## References"],
+        "agents": ["archunit-installer", "commons-logging-installer"],
+        "overrides": {
+          "archunit-installer": {
+            "$comment": "Each path is listed twice, once rooted and once under `**/`, because `**` expands to `.*` and a single-module project writes `src/test/...` with nothing before it — the same pair `executor` carries for `src/**`.",
+            "write_allow": [
+              "pom.xml", "**/pom.xml",
+              "src/test/java/**/ArchitectureTest.java",
+              "**/src/test/java/**/ArchitectureTest.java",
+              "src/test/java/**/TestcontainersConfiguration.java",
+              "**/src/test/java/**/TestcontainersConfiguration.java"
+            ]
+          },
+          "commons-logging-installer": {
+            "write_allow": [
+              "pom.xml", "**/pom.xml",
+              "src/main/java/**/logging/**",
+              "**/src/main/java/**/logging/**",
+              "src/test/java/**/logging/**",
+              "**/src/test/java/**/logging/**",
+              "src/main/resources/META-INF/spring/*.imports",
+              "**/src/main/resources/META-INF/spring/*.imports"
+            ]
+          }
+        }
+      },
+      "verifier": {
+        "$comment": "Reads text nobody here wrote — a public issue — and checks it against the repository. The class exists for invariant 5's second reason, restricting tools: an empty `write_allow` makes `guard` refuse every in-repo write by `agent_type`, through `Bash` too, so an instruction hidden in the text cannot reach a hook or a norm. `executor: false` is the first agent class that never writes; its scratch work for a generated-project reproduction lands outside the repository, which the guard does not judge. `## Verdict format` is required because the caller relays the return verbatim and asks the user to publish it — its shape is the contract. Meta-repository only: export.agents.exclude. ",
+        "executor": false,
+        "pattern_catalog": false,
+        "required_fields": ["effort"],
+        "write_allow": [],
+        "required_sections": ["## Verdict format", "## Failure mode", "## References"],
+        "agents": ["issue-verifier"]
+      }
+    }
+  },
+
+  "subagent_context": {
+    "$comment": "Read by ArchHook.java `context subagent`, registered at SubagentStart only in project-bootstrap/templates/settings.json.example — so it runs in generated projects and nowhere here. For an agent whose effective `agent_classes` `pattern_catalog` is true, the mode extracts each heading in `sections` from `file` up to the next H2, prefixes `header`, appends `pointer`, and hands the result to the subagent as `additionalContext` before its first turn. Sections, not the whole file: the runtime caps `additionalContext` at 10 000 characters and above it replaces the text with a path and a preview the model is not asked to read, so `max_chars` keeps a margin under that cap and `schema` renders the text and fails when it grows past it. The file stays the single owner of the catalog — nothing here copies it; renaming one of the headings below empties the injection, and `schema` fails on that by name. Why a hook and not the agent's `skills:` field: a skill with `disable-model-invocation: true` cannot be preloaded, so `skills: gof-design-patterns` never delivered anything. ",
+    "header": "Design-pattern catalog, injected at SubagentStart by `ArchHook.java context subagent` from `.claude/skills/gof-design-patterns/SKILL.md`. Implement the rows of the spec's `## Design patterns` — the design skills already decided them; adopt a row on your own only for a symptom already on disk, naming its `file:line` — the \"When not\" column binds. Never invoke `/gof-design-patterns` from here: it is manual-only, and you are the sole writer of what you implement.",
+    "file": ".claude/skills/gof-design-patterns/SKILL.md",
+    "sections": [
+      "## Why this is a skill and not a rule",
+      "## Catalog",
+      "## Forbidden in this repository"
+    ],
+    "pointer": "Full GoF triage (every pattern, with this repository's verdict on each): `.claude/skills/gof-design-patterns/references/pattern-catalog.md`. Shape exemplars: `.claude/skills/gof-design-patterns/templates/`. Read them only for a force or symptom the table above does not match.",
+    "max_chars": 9000
+  },
+
+  "compose": {
+    "$comment": "Read by ArchHook.java `compose`, and through it by `doctor`. A service that publishes a port to the host is claiming the host can reach it; when it ALSO advertises its own address to clients — a broker, a registry, anything that answers a bootstrap with `talk to me there instead` — the two claims have to agree. docker-architect's Kafka exemplar published 9092:9092 and advertised only `kafka:9092`, so every host-side publish died on `UnknownHostException: kafka` while the broker's healthcheck (run INSIDE the container, where localhost IS the broker) passed and Testcontainers' own correctly-wired listeners kept the integration tests green: lessons-learned-013 § 11. Every mechanism that could have caught it looked somewhere else, which is why this one reads the file instead of the runtime and answers with the daemon down. `advertised_env_suffixes` are matched with endsWith against each environment key, not as globs — one less pattern language in a check whose whole value is being unambiguous; a new advertising service adds a suffix here, never a condition in the Java, invariant 10. `host_addresses` is what counts as reachable from the host, and its first entry is the one the error message tells the reader to advertise. Question 5 of `compose`: every `${VAR:default}` the application points at a compose service must hold on both sides — the default reaches a host address on a port that service publishes (the run on the host), and the application's own service sets VAR, by name or by the relaxed-binding form of the property it sits under (the run in the container). The OTLP collector published no port from 0046 until issue #66, so every host-run export failed while `compose` reported healthy, and projects generated before 0046 never set OTLP_METRICS_ENDPOINT on `app`. `app_config_globs` are the files read for placeholders; `app_service_key` is the key that marks a compose service as the application itself (built here, not pulled). ",
+    "advertised_env_suffixes": [
+      "_ADVERTISED_LISTENERS",
+      "_ADVERTISED_HOST_NAME",
+      "_ADVERTISED_ADDRESS",
+      "_ADVERTISED_URL",
+      "_EXTERNAL_URL"
+    ],
+    "host_addresses": ["localhost", "127.0.0.1"],
+    "app_config_globs": [
+      "src/main/resources/application*.yml",
+      "src/main/resources/application*.yaml",
+      "**/src/main/resources/application*.yml",
+      "**/src/main/resources/application*.yaml"
+    ],
+    "app_service_key": "build",
+    "datasource_pairs": {
+      "$comment": "Login half of question 5 of `compose`, a WARNING that never blocks: `compose` and `doctor` print it, `compose gate` never reads it. When the datasource URL reaches a compose service whose image repository (last path segment, tag dropped) is in an engine's `images`, the database in the JDBC URL is compared with `database_env` and the user with `username_env`, every `${VAR:default}` / `${VAR:-default}` read as its default, on the host run (base `application.yml`) and in the application service. The password is never compared or printed: only whether the service sets `password_env` and the application side has none. A new engine is a new entry here, never a condition in the Java (invariant 10). Generated `application.yml` defaulted to `bankingapp`/`bankingapp`/empty while the `postgres` service created `appdb`/`app`/`app`, and question 5 reported the pair healthy because host and port matched: lessons-learned-021. ",
+      "url_property": "spring.datasource.url",
+      "username_property": "spring.datasource.username",
+      "password_property": "spring.datasource.password",
+      "engines": [
+        {
+          "images": ["postgres"],
+          "database_env": "POSTGRES_DB",
+          "username_env": "POSTGRES_USER",
+          "password_env": "POSTGRES_PASSWORD"
+        },
+        {
+          "images": ["mysql"],
+          "database_env": "MYSQL_DATABASE",
+          "username_env": "MYSQL_USER",
+          "password_env": "MYSQL_PASSWORD"
+        }
+      ]
+    }
+  },
+
+  "guard": {
+    "$comment": "Read by ArchHook.java `guard` mode, registered in .claude/settings.json and in project-bootstrap/templates/settings.json.example. A phase opens when a skill listed in `skill_classes` is invoked (by `/<skill>` or a Skill call) and closes on the next prompt. While it is open, Write/Edit must match the active skill's `write_allow` — deny by default, which is the whole difference from the denylist this block used to carry: `docker-compose.yml` is not under `src/**`, so a design run wrote a schema-registry service block into it while every skill involved forbade the write in prose (lessons-learned-012 §§ 4, 12, 13). A write that carries an `agent_type` is judged by that agent's own class instead, `agent_classes` above — no phase involved, which is also why an Agent call no longer closes the open phase: the main thread's territory is not the subagent's business. A Skill call to a `blocked_during_design` class is refused while a `design_phase` class is open. Independently of all of it, any file under `use_cases_dir`/UC-*/ whose UC-*-spec.md has a status in `frozen_statuses` is blocked, except the executor's single Edit of `status: approved` to `status: implemented`. Which skills design, which agents execute, and what each class may write are NOT here: they are `skill_classes` and `agent_classes` above, single owner each. `frozen_exempt_basenames` is the third write a frozen folder admits, and the only one that is not an edit of the spec: a file with one of these basenames sitting DIRECTLY under the UC-NNN folder is always writable, whatever tool, phase or agent produces it. /new-feature's consolidation requires one CHANGELOG.md line per change an impact row makes to an already-approved case — the write that keeps the approved spec itself untouched — and the guard blocked exactly that, advising `status: draft` on an implemented spec to get past it (lessons-learned-013 § 1). Matched on the basename, never on content: knowing an append is really an append would mean reimplementing Edit's semantics inside the hook, and a changelog is a log the guard has no reason to read. ",
+    "use_cases_dir": "docs/use-cases",
+    "frozen_statuses": ["approved", "implemented", "implemented-blocked"],
+    "frozen_exempt_basenames": ["CHANGELOG.md"],
+
+    "$comment_sweep_exempt": "Read by ArchHook.java `guard sweep` only: a porcelain path matching one of these globs is skipped before the territory and frozen-folder checks. Each entry is a VERSIONED path a hook writes on its own, in parallel with the baseline `guard prompt` takes — so the turn never wrote it, and the sweep's advice to revert would delete it. `.claude/audit-usage/**` is the `audit` trail (AUDIT_DIR in the source): `audit prompt` appends history.jsonl and nodes.jsonl at UserPromptSubmit, `audit flush` writes the run report at Stop, and hooks of one event run in parallel, so whether the sweep saw them was a race (issue #55). The tool-time guards do NOT read this list: `guard write` and `guard bash` still refuse the model a write there, which is what keeps the trail evidence. Not a way to widen a territory — a path the model is meant to write belongs in `write_allow`. ",
+    "sweep_exempt": [".claude/audit-usage/**"],
+
+    "$comment_status": "The spec's state machine, read by ArchHook.java's isStatusClose and isChecklistToggle and by the Stop sweep's isSpecEditLegalOnDisk — three callers, one owner, so they cannot drift. `status_transitions` maps the status a spec carries to what a close may write into it: `draft` is absent on purpose (it is not closable by a tool, only by /new-feature's own approval) and neither closed state walks further on its own. `implemented-blocked` exists because the concept lived in prose in three places and in the state machine in none: the executor's contract says an approved case left unreachable end to end keeps its code on disk and its spec NOT closed, step 19 says a green build closes the spec, and the guard admitted approved→implemented alone — so the run that followed step 19 could not get back, and the hook's advice (`set status: draft`) would have made the case open again and blocked the next /new-feature at input row 6 (lessons-learned-014 § 5). `implemented → approved` is the revert that run needed and did not have. `checklist_toggle_statuses` is every status whose spec still admits `[ ]` → `[x]`: all three, because a toggle is monotone and carries none of the risk immutability exists to prevent, and because requiring `approved` froze 23 unticked boxes forever the moment a run closed the status first (lessons-learned-014 § 4). The write ORDER that avoids that is not here — it is a procedure the executor follows, written in .claude/agents/java-spring-boot-developer.md. ",
+    "status_transitions": {
+      "approved": ["implemented", "implemented-blocked"],
+      "implemented": ["approved"],
+      "implemented-blocked": ["approved"]
+    },
+    "checklist_toggle_statuses": ["approved", "implemented", "implemented-blocked"],
+
+    "bash_write_shapes": {
+      "$comment": "Read by ArchHook.java `guard bash`, registered as PreToolUse/matcher Bash in the same two settings files as `guard write`. Every other enforcement here is reached through a tool-name matcher, so a heredoc, a `sed -i` or a `tee` passed through none of them — the net was tool-shaped, not filesystem-shaped, and a host setting that prefers Bash for edits disabled all of it in silence (lessons-learned-014 § 1). The exposure is uneven and only two guarantees have no second net: class territory and the frozen UC-NNN folder, which is what `guard bash` checks. The layer boundary is re-checked by ArchUnit at `./mvnw verify` and formatting by `spotless:apply`, so `check` and `format` stay off Bash on purpose — a PostToolUse matcher there pays a JVM on every `ls`. THE BAR IS NOT COMPLETENESS: shell has more ways to write a file than any list holds, and a parser that blocked on what it could not read would stop `./mvnw` on its first false positive and be deleted the same week. A target holding an `unresolvable_markers` entry, or landing outside the repository, is skipped without a word; a command with no shape below exits immediately. What this buys is that the obvious spellings stop being free. `targets` says where a command's own writes sit: `all` operands, the `tail` after the first (a sed script), the `last` one, or the ones carrying `operand_prefix`. `requires_flag_prefix` is what keeps a read-only `sed` out of it. `script_flags` name the flags whose value is the script (`sed -e 's/…/'`, `-f file.sed`, `--expression=…`): when one is present, no operand is a script, so a `tail` shape judges every operand. An empty word (`''`, the in-place suffix of BSD/macOS `sed -i ''`) is never an operand. Before 0118, both read the sed script as a path and refused it (`s/a/b/g is outside its territory`). Adding a shape is one entry here and no Java — invariant 10. ",
+      "redirect_operators": [">", ">>"],
+      "unresolvable_markers": ["$", "`", "*", "?", "~"],
+      "commands": [
+        { "name": "tee", "targets": "all" },
+        { "name": "truncate", "targets": "all" },
+        { "name": "sed", "targets": "tail", "requires_flag_prefix": "-i", "script_flags": ["-e", "--expression", "-f", "--file"] },
+        { "name": "perl", "targets": "tail", "requires_flag_prefix": "-i" },
+        { "name": "cp", "targets": "last" },
+        { "name": "mv", "targets": "last" },
+        { "name": "install", "targets": "last" },
+        { "name": "rsync", "targets": "last" },
+        { "name": "dd", "targets": "prefixed", "operand_prefix": "of=" }
+      ]
+    },
+
+    "force_push": {
+      "$comment": "Read by ArchHook.java `guard bash` (bashForcePush), before any write target is looked at: a `git push` carrying one of `long_flags` (exact, or with `=value`), a short-flag cluster containing `short_flag` (`-f`, `-uf`), or an operand starting with `refspec_prefix` (`+main`) exits 2. `permissions.deny: Bash(git push --force:*)` stays as the free first layer, but a prefix rule is blind to `-f`, `--force-with-lease`, `+ref`, `git -C . push --force` and `sh -c \"git push --force\"` — the five variants lessons-learned-015 § H lists and the permission docs confirm. `git_options_with_value` are the global options skipped two words at a time before the subcommand; a `shell_wrappers` head followed by `shell_command_flag` has its string re-parsed, one level. `--force-with-lease` is blocked on purpose: safer than --force, still a rewrite of published history. Not caught, by the same bar 0063 set: a flag held in a variable, a git alias. ",
+      "shell_wrappers": ["sh", "bash", "zsh"],
+      "shell_command_flag": "-c",
+      "git_options_with_value": ["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"],
+      "long_flags": ["--force", "--force-with-lease"],
+      "short_flag": "f",
+      "refspec_prefix": "+"
+    }
+  },
+
+  "source": {
+    "$comment": "Where a project pulls this `.claude/` from, and how. Read by `arch-adopt` and by the `export` mode's stamp; validated by `schema`. Deliberately a sibling of `export` and not a field inside it: the exported copy drops the `export` block (its lists describe THIS repository) and keeps this one, which is what lets a project update itself without the plugin. An indirection on purpose — moving from GitHub to a licensing endpoint changes `base_url` and `auth_env`, never the code path that consumes them. `{ref}` is substituted with the resolved ref; `git_url` is what resolves `latest-tag`, through `git ls-remote --tags`, with no API client and no JSON to parse. `auth_env` names an environment variable and never carries its value — invariant 11, the same rule .mcp.json obeys; the header is sent only when the variable is set, so a public repository needs no credential. `--source <local path>` bypasses this block entirely, which is how an unreleased change is tested.",
+    "base_url": "https://codeload.github.com/nerviz-ai/nerviz/tar.gz/{ref}",
+    "git_url": "https://github.com/nerviz-ai/nerviz.git",
+    "auth_env": "GH_TOKEN",
+    "auth_header": "Authorization: Bearer",
+    "default_ref": "latest-tag",
+    "stamp_file": ".claude/.arch-provenance.json"
+  },
+
+  "migrations": {
+    "$comment": "Convention changes that leave already-generated code behind, one entry each. Read by `arch-adopt` on an update: it collects the `id`s in the project's own copy of this file BEFORE `export` overwrites it, compares them with the fetched copy, and for every new entry whose `blueprints` names the active blueprint prints `note` and `prompt` — the prompt is for the user to paste into Claude Code inside the project, never run by the skill. A sibling of `source`, not a field of `export`, for the same reason: it has to travel, since the project's copy is the record of which entries it has already been shown, and a project generated after an entry was written carries its id and never sees it. `required_fields` and `id_pattern` are what `schema` checks; `blueprints` must name existing blueprints, checked only in this repository (a project has its active one alone). An entry is never edited after it ships — a correction is a new id. ",
+    "required_fields": ["id", "blueprints", "note", "prompt"],
+    "id_pattern": "[a-z0-9]+(-[a-z0-9]+)*",
+    "entries": [
+      {
+        "id": "use-case-subpackage-per-aggregate",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal"],
+        "note": "Use cases are now grouped in one subpackage per aggregate: `application.usecase.<aggregate>` in clean-architecture, `application.port.in.<aggregate>` and `application.service.<aggregate>` in hexagonal. Code generated before this change sits flat at the package root, and new use cases will land in subpackages, so the package mixes both layouts until the old ones are moved. Nothing breaks if they stay; the move is a refactor, no behavior changes.",
+        "prompt": "Move this project's use cases into one subpackage per aggregate, as the naming convention in .claude/rules/naming.md now requires. Every *UseCase sitting directly in the use-case package — with its *Command, and in hexagonal its *Service too — goes into the subpackage named after the aggregate it writes (a query: the aggregate it reads; the outbox relay and prune use cases: `outbox`; one that touches no aggregate: the aggregate its trigger concerns, else the noun of its own name), lowercase, the same segment the persistence adapter's subpackage uses. Output ports and types shared by several aggregates stay at the package root. Mirror the moves in src/test, fix every import, change no behavior, and run ./mvnw verify. Show me the list of moves before applying any."
+      },
+      {
+        "id": "kafka-string-wire-contract",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "modular-monolith", "layered", "vertical-slice", "onion"],
+        "note": "Kafka payloads now travel as JSON text, converted once per side: StringSerializer/StringDeserializer in application.yml, the producer converts the payload record with Boot's JsonMapper (the Form A publisher before send, the outbox writer at append time), and one StringJacksonJsonMessageConverter bean builds each listener's typed parameter. Projects generated before this change configured spring-kafka's JsonSerializer/JsonDeserializer, which are deprecated for removal since spring-kafka 4.0, add a __TypeId__ header naming the producer's class, and, next to an outbox relay, publish every payload double-encoded as a quoted JSON string. Only matters if the project uses Kafka. The move changes the bytes on the wire: check every consumer of these topics, including other services, before applying it.",
+        "prompt": "Move this project's Kafka messaging to the wire contract in .claude/rules/messaging.md § Topics and serialization, using .claude/skills/messaging-architect/templates/ as the shape. In application.yml set spring.kafka.producer.value-serializer to StringSerializer and spring.kafka.consumer.value-deserializer to StringDeserializer, and remove spring.json.* properties. Make every producer adapter take KafkaTemplate<String, String> and convert its payload record with the injected JsonMapper before send; make the outbox writer store that same JSON text and the relay send it unchanged. Add one StringJacksonJsonMessageConverter bean next to the listeners' error-handler wiring, and leave the typed @KafkaListener parameters as they are. Before changing anything, list every topic this project produces to, whether its payload is double-encoded today, and every consumer you can find, inside or outside this repository, and wait for my go-ahead. Then run ./mvnw verify."
+      },
+      {
+        "id": "javadoc-only-comments",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "modular-monolith", "layered", "vertical-slice", "onion"],
+        "note": "Javadoc is now the only comment in production code (.claude/rules/code-quality.md § Comments). The exceptions are one // line inside an otherwise empty body and a tool directive (NOSONAR, CHECKSTYLE:OFF/ON, spotless:off/on, @formatter:off/on). TODO comments are no longer allowed in any form. New projects enforce this with Checkstyle at the validate phase. /arch-adopt does not touch config/checkstyle/checkstyle.xml, so an existing project keeps building with its old config and its existing comments until it adds the modules itself. Test code is not checked by Checkstyle; review holds it to the same section.",
+        "prompt": "Apply .claude/rules/code-quality.md § Comments to this project's src/main code: Javadoc is the only comment. Do it in two steps. First, convert every // and /* */ comment in src/main that is not one of the two exceptions. A reason that must survive the next edit goes into the Javadoc of the type or method it explains. A comment that only describes the code is replaced by a better name, or by an extracted method whose name says what the comment said. A TODO becomes an issue. List each file and what you plan for its comments, and wait for my go-ahead before you change anything. Second, add these modules to config/checkstyle/checkstyle.xml, exactly as written. At Checker level, before the TreeWalker: <module name=\"RegexpMultiline\"><property name=\"id\" value=\"LineComment\"/><property name=\"fileExtensions\" value=\"java\"/><property name=\"format\" value=\"^(?:(?&lt;!\\{[ \\t]{0,40}\\r?\\n)|(?=[^\\r\\n]*\\r?\\n(?![ \\t]*\\})))[ \\t]*//(?![ \\t]*(?:NOSONAR|CHECKSTYLE:(?:OFF|ON)|spotless:(?:off|on)|@formatter:(?:off|on))\\b)\"/><property name=\"message\" value=\"code-quality.md § Comments: Javadoc is the only comment.\"/></module> <module name=\"RegexpMultiline\"><property name=\"id\" value=\"BlockComment\"/><property name=\"fileExtensions\" value=\"java\"/><property name=\"format\" value=\"^[ \\t]*/\\*(?!\\*)\"/><property name=\"message\" value=\"code-quality.md § Comments: Javadoc is the only comment.\"/></module>. Inside the TreeWalker, replacing the existing TodoComment module: <module name=\"TrailingComment\"><property name=\"format\" value=\"^\\s*$\"/><property name=\"legalComment\" value=\"^\\s*(NOSONAR|CHECKSTYLE:(OFF|ON)|spotless:(off|on)|@formatter:(off|on))\\b\"/></module> <module name=\"InvalidJavadocPosition\"/> <module name=\"TodoComment\"><property name=\"format\" value=\"\\bTODO\\b\"/></module>. Change no behavior, and run ./mvnw verify."
+      },
+      {
+        "id": "spotless-check-and-test-checkstyle",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "modular-monolith", "layered", "vertical-slice", "onion"],
+        "note": "The build now runs its offline checks at verify, src/test included (.claude/rules/code-quality.md § How to verify, .claude/rules/naming.md § Restricted identifiers). Maven binds spotless:check to verify and runs a second Checkstyle execution, checkstyle-test, over src/test with its own light config/checkstyle/checkstyle-test.xml; Gradle points checkstyleTest at that same file (spotlessCheck was already part of check). Both Checkstyle configs reject record, yield, var, permits, sealed and when as identifiers. /arch-adopt writes no build file, so a project generated before v0.10.0 still passes ./mvnw verify with unformatted files and unused imports that CI then rejects, and nothing checks the restricted identifiers. A project generated from v0.10.0 onward already has all of this; the prompt checks first and stops.",
+        "prompt": "Bring this project's build to the offline checks of .claude/rules/code-quality.md § How to verify and .claude/rules/naming.md § Restricted identifiers. First check whether it is already there: with Maven, the root pom.xml's spotless-maven-plugin has an execution with id spotless-check; with Gradle, checkstyleTest reads config/checkstyle/checkstyle-test.xml. If it is, tell me so and stop. Otherwise do it in two steps. First, write the build changes, exactly as written. Create config/checkstyle/checkstyle-test.xml with: <?xml version=\"1.0\"?> <!DOCTYPE module PUBLIC \"-//Checkstyle//DTD Checkstyle Configuration 1.3//EN\" \"https://checkstyle.org/dtds/configuration_1_3.dtd\"> <module name=\"Checker\"><property name=\"severity\" value=\"error\"/><property name=\"charset\" value=\"UTF-8\"/><module name=\"TreeWalker\"><module name=\"IllegalIdentifierName\"><property name=\"format\" value=\"^(?!(record|yield|var|permits|sealed|when)$|\\S*\\$)\\S+$\"/></module></module></module> In config/checkstyle/checkstyle.xml, add inside the TreeWalker: <module name=\"IllegalIdentifierName\"><property name=\"format\" value=\"^(?!(record|yield|var|permits|sealed|when)$|\\S*\\$)\\S+$\"/></module> With Maven, in the root pom.xml's pluginManagement: give spotless-maven-plugin <executions><execution><id>spotless-check</id><phase>verify</phase><goals><goal>check</goal></goals></execution></executions>, and add to maven-checkstyle-plugin's executions, next to checkstyle-validate: <execution><id>checkstyle-test</id><phase>verify</phase><goals><goal>check</goal></goals><configuration><configLocation>${maven.multiModuleProjectDirectory}/config/checkstyle/checkstyle-test.xml</configLocation><sourceDirectories><sourceDirectory>${project.build.testSourceDirectory}</sourceDirectory></sourceDirectories><includeResources>false</includeResources><cacheFile>${project.build.directory}/checkstyle-test-cachefile</cacheFile></configuration></execution> With Gradle, next to the existing checkstyle { } block of the root build.gradle: tasks.named('checkstyleTest') { configFile = rootProject.file('config/checkstyle/checkstyle-test.xml') }. If .github/workflows/ci.yml runs spotless:check or spotlessCheck as a step of its own, remove that step: the build now runs it. Show me the build changes and wait for my go-ahead. Second, run ./mvnw spotless:apply (Gradle: ./gradlew spotlessApply), which reformats every file the format hook missed, then ./mvnw verify (Gradle: ./gradlew build). Rename any identifier Checkstyle reports under IllegalIdentifierName, in src/main and src/test, and change no behavior."
+      },
+      {
+        "id": "otlp-host-run",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "modular-monolith", "layered", "vertical-slice", "onion"],
+        "note": "The OTLP collector service now publishes its port to the host, on a variable host port: \"${OTLP_HTTP_PORT:-4318}:4318\". With it, the observability defaults in application.yml (http://localhost:4318/v1/traces and /v1/metrics) work when the application runs on the host with ./mvnw spring-boot:run. Projects generated from v0.1.0 until this change have a collector with no ports:, so every trace and metric export fails on the host. Projects generated before v0.1.0 also have no OTLP_METRICS_ENDPOINT on the app service, so in the container their metrics go to the application itself. /arch-adopt does not write docker-compose.yml. After this update, java .claude/hooks/ArchHook.java compose reports both gaps, and its Stop gate blocks on them until they are fixed. Only matters if docker-compose.yml has an otel-collector service.",
+        "prompt": "Bring this project's OTLP wiring to .claude/skills/docker-architect/SKILL.md step 5 and .claude/skills/docker-architect/templates/otel-collector-service.yml.example. First, if docker-compose.yml has no otel-collector service, tell me so and stop. Otherwise check two things: the otel-collector service publishes container port 4318 to the host, and the app service's environment sets both OTLP_ENDPOINT: http://otel-collector:4318/v1/traces and OTLP_METRICS_ENDPOINT: http://otel-collector:4318/v1/metrics. If both already hold, tell me so and stop. Otherwise show me the change and wait for my go-ahead. Add ports: - \"${OTLP_HTTP_PORT:-4318}:4318\" to the otel-collector service, and add whichever of the two variables is missing to the app service. Leave the defaults in application.yml at http://localhost:4318/v1/traces and http://localhost:4318/v1/metrics. If another project already holds host port 4318, set OTLP_HTTP_PORT for this project in .env, and set OTLP_ENDPOINT and OTLP_METRICS_ENDPOINT to that port for runs on the host. Then run docker compose up -d otel-collector and java .claude/hooks/ArchHook.java compose, and show me its output."
+      },
+      {
+        "id": "one-call-throw-lambda",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "modular-monolith", "layered", "vertical-slice", "onion"],
+        "note": "The lambda of a throw assertion now makes exactly one call, and the build checks it (.claude/rules/testing.md § Names and shape). The rule covers AssertJ's assertThatThrownBy, isThrownBy, assertThatCode, catchThrowable, catchThrowableOfType and catchException, and JUnit's assertThrows and assertThrowsExactly. A method call and a constructor call each count, and so does each link of a chain. New projects carry a Checkstyle check, OneCallInThrowLambda, in config/checkstyle/checkstyle-test.xml, which fails ./mvnw verify. Before, only the rule line asked for it, and SonarQube reported the same shape as java:S5778 after a full scan. /arch-adopt writes no build file, so an existing project keeps building without the check until it adds the module. Tests that break the rule then fail the build until they are rewritten.",
+        "prompt": "Make the one-call rule for throw-assertion lambdas in .claude/rules/testing.md § Names and shape a build check in this project. First, if config/checkstyle/checkstyle-test.xml does not exist, tell me to apply the spotless-check-and-test-checkstyle migration first, and stop. If that file already has a module with id OneCallInThrowLambda, tell me so and stop. Otherwise do it in two steps. First, add this module inside the TreeWalker of config/checkstyle/checkstyle-test.xml, exactly as written: <module name=\"MatchXpath\"><property name=\"id\" value=\"OneCallInThrowLambda\"/><property name=\"query\" value=\"//METHOD_CALL[(IDENT | DOT/IDENT)[@text = ('assertThatThrownBy', 'isThrownBy', 'assertThatCode', 'catchThrowable', 'catchThrowableOfType', 'catchException', 'assertThrows', 'assertThrowsExactly')]]/ELIST/LAMBDA[count(.//METHOD_CALL) + count(.//LITERAL_NEW) &gt; 1]\"/><message key=\"matchxpath.match\" value=\"testing.md § Names and shape: the lambda of a throw assertion makes exactly one call. Build its arguments in the arrange block.\"/></module> Then run ./mvnw verify (Gradle: ./gradlew build). List every test it reports under OneCallInThrowLambda, with the rewrite you plan for each, and wait for my go-ahead. Second, rewrite each one so the lambda holds only the call under test. Build every argument in the arrange block. For a chained call such as find(id).orElseThrow(), keep the intermediate value in a local variable and leave only the last call in the lambda. Change no behavior and no assertion, and run ./mvnw verify again."
+      },
+      {
+        "id": "use-case-spec-partial-status-line",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "modular-monolith", "layered", "vertical-slice", "onion"],
+        "note": "use-case-design no longer writes a `> Partial status:` line in docs/use-cases/UC-*/00-caso-de-uso.md: which partials a use case has is read from its folder. The template dropped the line in v0.9.1, but specs written before that still carry it, frozen at the state it had on the day it was written — usually a ❌ for partials that exist today. use-case-design now names its template as the only source of the file's shape, so an old spec no longer leaks the line into a new one, and the line is harmless where it stays. A folder whose UC-NNN-spec.md is approved, implemented or implemented-blocked is frozen: the guard refuses Claude Code's edits there on purpose, so the prompt cleans only the other folders and lists the frozen ones for you. Only matters if docs/use-cases/ exists.",
+        "prompt": "Remove the stale `> Partial status:` line from this project's use case specs. First, find every docs/use-cases/UC-*/00-caso-de-uso.md with a line that starts with `> Partial status:`. If there is none, tell me so and stop. Otherwise split the files in two by the status: line of the UC-NNN-spec.md in the same folder: frozen (approved, implemented or implemented-blocked) and open (any other status, or no UC-NNN-spec.md yet). Show me both lists and wait for my go-ahead. Then delete that one line, and nothing else, from each open file. Do not edit a frozen folder and do not change any status: line to get past the guard. For each frozen file, print its path and the line number, so I can delete the line by hand outside Claude Code or keep it as history."
+      },
+      {
+        "id": "multiple-string-literals",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "modular-monolith", "layered", "vertical-slice", "onion"],
+        "note": "A string literal repeated in one production file is now a build failure, not only a rule line (.claude/rules/code-quality.md § Clean Code — hard limits, \"no magic numbers or strings\"; § How to verify). New projects carry a Checkstyle check, MultipleStringLiterals, in config/checkstyle/checkstyle.xml, with SonarQube java:S1192's numbers exactly: a literal of 5 or more characters, outside annotations, flagged on its third occurrence in a file. It runs at validate, over production code only, as S1192 skips test files. Before, SonarQube reported the shape after a full scan, with the gate already red. /arch-adopt writes no build file, so an existing project keeps building without the check until it adds the module. Production files that repeat a literal then fail the build until the literal becomes a constant.",
+        "prompt": "Make the repeated-string-literal limit of .claude/rules/code-quality.md a build check in this project. First, if config/checkstyle/checkstyle.xml does not exist, tell me so and stop. If that file already has a module with id MultipleStringLiterals, tell me so and stop. Otherwise do it in two steps. First, add this module inside the TreeWalker of config/checkstyle/checkstyle.xml, next to MagicNumber, exactly as written: <module name=\"MultipleStringLiterals\"><property name=\"id\" value=\"MultipleStringLiterals\"/><property name=\"allowedDuplicates\" value=\"2\"/><property name=\"ignoreStringsRegexp\" value='^\".{0,4}\"$'/></module> Do not add it to config/checkstyle/checkstyle-test.xml. Then run ./mvnw validate (Gradle: ./gradlew checkstyleMain). List every file it reports under MultipleStringLiterals, with the literal and the constant you plan for it, and wait for my go-ahead. Second, replace each repeated literal with one private static final String in the class that repeats it, named after what the value means, not after its text. When several methods of one class build the same structure around the literal, extract that structure into one private method instead, so the literal appears once. Change no behavior and no message text, and run ./mvnw verify (Gradle: ./gradlew build)."
+      },
+      {
+        "id": "rename-to-nerviz",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "modular-monolith", "layered", "vertical-slice", "onion"],
+        "note": "claude-spring-architect is now Nerviz, at github.com/nerviz-ai/nerviz. The old address github.com/ice-lfernandes/claude-spring-architect redirects there, so updates keep working, and this update already points the source block of .claude/schemas/extensions.json at the new address. Files outside .claude/ that the bootstrap wrote once still carry the old name and link: the root README.md (and README.pt-br.md, if present) and the root CLAUDE.md, in its report-issue routing row. Nothing breaks if they stay; the prompt only renames.",
+        "prompt": "Rename claude-spring-architect to Nerviz in this project's files outside .claude/. First, search README.md, README.pt-br.md and CLAUDE.md at the project root for claude-spring-architect and ice-lfernandes. If there is no match, tell me so and stop. Otherwise show me every matching line and wait for my go-ahead. Then replace each link https://github.com/ice-lfernandes/claude-spring-architect with https://github.com/nerviz-ai/nerviz, and each remaining claude-spring-architect, with or without backticks, with Nerviz. Change nothing else in those files, and do not touch .claude/."
+      },
+      {
+        "id": "datasource-env-convention",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "modular-monolith", "layered", "vertical-slice", "onion"],
+        "note": "The datasource now uses one set of variables from end to end: DB_NAME, DB_USERNAME, DB_PASSWORD and DB_PORT, read by application.yml and by the database service in docker-compose.yml alike, with the same defaults on both sides. The database and user default to the artifact name (\"-\" becomes \"_\"). The password has no default anywhere: it lives in an untracked .env that docker compose reads and application.yml imports (spring.config.import: optional:file:.env[.properties]). Every database and Kafka host port is a variable. Projects generated before this change default application.yml to one database and user while the postgres service creates appdb/app/app, so the run on the host fails to log in even with the container healthy, and the compose password default contradicts .claude/rules/secrets.md. `java .claude/hooks/ArchHook.java compose` and /arch-doctor now print that disagreement as a warning. It never blocks, and nothing breaks if you keep the old wiring and it works for you.",
+        "prompt": "Bring this project's datasource wiring to the convention in .claude/skills/docker-architect/SKILL.md steps 4.5 and 5, .claude/skills/docker-architect/templates/postgres-service.yml.example (or mysql-service.yml.example) and .claude/skills/docker-architect/templates/env.example.example. First, if docker-compose.yml has no postgres or mysql service, say so and stop. Pick ONE database name and ONE user: the ones the running database already has, if its volume holds data you want to keep (docker exec <container> env shows only what the container was started with, so list the databases and roles from inside the database); otherwise the artifact name with - replaced by _. In docker-compose.yml: the database service reads POSTGRES_DB: ${DB_NAME:-<name>}, POSTGRES_USER: ${DB_USERNAME:-<user>}, POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env} (MYSQL_* likewise, MYSQL_ROOT_PASSWORD from DB_ROOT_PASSWORD), publishes \"${DB_PORT:-<port>}:<port>\", and its healthcheck reads $${POSTGRES_USER} and $${POSTGRES_DB}. The app service sets DB_URL (compose hostname, ${DB_NAME:-<name>}), DB_USERNAME and DB_PASSWORD by those names, replacing any SPRING_DATASOURCE_* entry. If Kafka is there, its host ports become ${KAFKA_PORT:-9092} and ${KAFKA_EXTERNAL_PORT:-29092}, the EXTERNAL advertised listener reads the same variable, and spring.kafka.bootstrap-servers defaults to localhost:${KAFKA_EXTERNAL_PORT:29092}. In application.yml: spring.config.import: optional:file:.env[.properties] (multi-module: optional:file:../.env[.properties],optional:file:.env[.properties]), url ${DB_URL:jdbc:postgresql://localhost:${DB_PORT:<port>}/${DB_NAME:<name>}}, username ${DB_USERNAME:<user>}, password ${DB_PASSWORD} with no default. Rename any ${DB_USER} to ${DB_USERNAME}. Create .env.example with the keys and empty values, and add .env to .gitignore and .dockerignore. Write .env only if it does not exist: DB_PASSWORD is the password the database volume already uses when you keep the data (ask me for it, never guess it, never print it), or a random one otherwise. Never read .env back into the conversation. If you changed the name, user or password of a database whose volume already holds data, tell me that the image applies them only to an empty volume and that docker compose down -v applies them by deleting the data, and do not run it. Then run java .claude/hooks/ArchHook.java compose, show me its output, and run the build's verify goal."
+      },
+      {
+        "id": "ci-it-check-reads-aggregates",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "modular-monolith", "layered", "vertical-slice", "onion"],
+        "note": "The 'integration tests actually ran' step of .github/workflows/build.yml had two defects. First, it failed builds where every integration test passed: with Maven, as soon as one IT holds its tests in @Nested classes (failsafe writes Tests run: 0 in the enclosing class's .txt report); with Gradle, when @Nested ITs are the only ITs (every report is named <Outer>$<Nested>.xml, which *IT.xml does not match). Second, it never caught the Docker guard it exists for: a class switched off by @EnabledIf is reported as skipped, not as zero tests, so the step stayed green. The step now sums the build tool's aggregate counts and fails when any integration test was skipped or none ran (.claude/rules/testing.md § Database in integration tests). /arch-adopt does not write .github/workflows/, so a project generated before this change keeps the old step. Once fixed, an IT with @Disabled or a failed assumption also fails CI.",
+        "prompt": "Rewrite the 'integration tests actually ran' step of .github/workflows/build.yml to follow .claude/rules/testing.md § Database in integration tests. Keep its first part as it is: no *IT.java under any src/test/java means exit 0 with an informational line. Replace everything after it. With Maven, find every */target/failsafe-reports/failsafe-summary.xml (one per module); none means exit 1, failsafe is not wired up. Sum <completed> and <skipped> over all of them; completed already includes skipped. With Gradle, find every XML under */build/test-results/integrationTest/, whatever its name ends with, since @Nested reports are named <Outer>$<Nested>.xml; none means exit 1. Sum the tests and skipped attributes of each file's <testsuite> element. In both cases, skipped > 0 means exit 1: print the count and the class of every report whose <testsuite> has a non-zero skipped attribute. A total of zero means exit 1. Otherwise print how many ran. The step runs under bash -eo pipefail, so a grep or find that may match nothing must not end the script. Read no per-class .txt report. Before changing anything, list every IT under src/test/java that carries @Disabled or an assumption, because each one will fail CI after this change, and wait for my go-ahead."
+      }
+
+    ]
+  },
+
+  "hook_build": {
+    "$comment": "How `ArchHook.java build` turns the source into the jar every hook registration launches, and what `schema` and `doctor` compare to call it stale. `javac_feature` is the pin: `build` refuses under any other JDK feature release, because `--verify` (run by CI) recompiles and compares class bytes, and two javac majors emit different bytes for the same source. `release` is what the classes target — the stated JDK 21+ dependency. `hash_entry` holds the SHA-256 of the source with CRLF normalized to LF: `* text=auto` gives a Windows checkout CRLF, and a raw hash would call a fresh jar stale. ",
+    "source": ".claude/hooks/ArchHook.java",
+    "jar": ".claude/hooks/ArchHook.jar",
+    "main_class": "ArchHook",
+    "release": 21,
+    "javac_feature": 21,
+    "hash_entry": "META-INF/archhook-source.sha256"
+  },
+
+"mcp": {
+    "$comment": "Validated by ArchHook.java schema, same as `types` above. ",
+    "match": [
+      ".mcp.json",
+      ".claude/skills/project-bootstrap/templates/mcp.json.example"
+    ],
+    "root_allowed": ["mcpServers"],
+    "server_allowed": [
+      "type", "url", "command", "args", "headers", "env",
+      "timeout", "oauth", "headersHelper", "alwaysLoad"
+    ],
+    "required_by_type": {
+      "stdio": ["command"],
+      "http": ["url"],
+      "sse": ["url"],
+      "ws": ["url"]
+    },
+    "name_pattern": "^[a-z][a-z0-9_-]*$",
+    "reserved_names": ["workspace", "computer-use"],
+    "secret_scan": {
+      "fields": ["headers", "env"],
+      "key_pattern": "(?i)(authorization|token|api[_-]?key|secret|password)",
+      "value_prefixes": ["Bearer ", "ghp_", "github_pat_", "sk-", "xoxb-", "AKIA"]
+    }
+  }
+}

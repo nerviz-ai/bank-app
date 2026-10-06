@@ -1,0 +1,58 @@
+/*
+ * EXEMPLAR — controller contract as an interface, OpenAPI documentation ONLY:
+ * `@Tag` at type level, each operation's composed `...OpenApiDocs` annotation
+ * (`OpenApiDocs.java.example`) at method level, and nothing else. No
+ * `@RequestMapping`/`@GetMapping`/`@PostMapping`, no `@PathVariable`/`@RequestParam`/
+ * `@RequestBody`, no bean-validation annotation, no Spring Data Web resolution
+ * annotation (`@ParameterObject`, `@PageableDefault`) — every annotation that makes
+ * the endpoint actually work lives on `Controller.java.example`, which implements
+ * this interface and repeats none of the doc annotations declared here (Spring
+ * Framework reference — Web MVC, "Annotated Controllers": annotations declared on an
+ * implemented interface's method are inherited by the class that implements it, so
+ * springdoc still resolves `@Tag`/`@CreateUserOpenApiDocs` off this file even though
+ * the mapping lives on the other one).
+ *
+ * Why split it out at all: `.claude/rules/api-rest.md` § OpenAPI requires every
+ * operation fully documented, and that's a lot of annotation weight. Separating the
+ * contract (this file) from the implementation (`Controller.java.example`) keeps the
+ * business method body free of documentation noise, and gives the contract a single
+ * file reviewers check against `10-dominio.md`'s ports without wading through
+ * `createUser.handle(...)` logic — and, unlike an earlier version of this exemplar,
+ * without wondering which file actually decides `/api/v1/users` or whether `@Valid`
+ * fires: that's answered by one file now, the controller.
+ *
+ * One interface per resource, matching its controller 1:1 — not one interface for the
+ * whole API. A `UserApi` with no controller behind it, or a `UserController` that
+ * doesn't implement `UserApi`, is a divergence: the interface is the contract, the
+ * class is the one implementation.
+ *
+ * No `@RequestHeader("Idempotency-Key")` parameter on `create` below, nor anywhere in
+ * `Controller.java.example`: `IdempotencyAspect` (`IdempotencyAspect.java.example`)
+ * reads the header directly off the raw `HttpServletRequest`, so nothing in the method
+ * signature needs to carry it — it's still documented via `CreateUserOpenApiDocs`'s own
+ * `@Parameter`.
+ */
+package com.exemplo.minhaapi.adapter.in.rest;
+
+import com.exemplo.minhaapi.adapter.in.rest.dto.CreateUserRequest;
+import com.exemplo.minhaapi.adapter.in.rest.dto.PageResponse;
+import com.exemplo.minhaapi.adapter.in.rest.dto.UserResponse;
+import com.exemplo.minhaapi.adapter.in.rest.openapi.CreateUserOpenApiDocs;
+import com.exemplo.minhaapi.adapter.in.rest.openapi.GetUserOpenApiDocs;
+import com.exemplo.minhaapi.adapter.in.rest.openapi.ListUsersOpenApiDocs;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
+
+@Tag(name = "Users", description = "User management")
+public interface UserApi {
+
+    @CreateUserOpenApiDocs
+    ResponseEntity<UserResponse> create(CreateUserRequest request);
+
+    @ListUsersOpenApiDocs
+    PageResponse<UserResponse> list(Pageable pageable);
+
+    @GetUserOpenApiDocs
+    UserResponse get(String userId);
+}

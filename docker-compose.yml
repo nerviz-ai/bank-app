@@ -1,0 +1,79 @@
+# Every service here is added by the docker-architect skill — single owner after
+# generation, see docker-architect/SKILL.md. Postgres and the OTel collector were merged
+# at generation time because `persistence-jpa` and `observability` are already active in
+# the blueprint; everything a use case adds later goes through /docker-architect.
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      # feature: persistence-jpa — same names application.yml reads, never SPRING_DATASOURCE_*.
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-bank_app}
+      DB_USERNAME: ${DB_USERNAME:-bank_app}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      # feature: observability — both signals, pointing at the collector's compose hostname.
+      OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+      OTLP_METRICS_ENDPOINT: http://otel-collector:4318/v1/metrics
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # feature: persistence-jpa — the engine application.yml's datasource.url already
+  # assumes. Tag matched to the one pinned in TestcontainersConfiguration.java.
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-bank_app}
+      POSTGRES_USER: ${DB_USERNAME:-bank_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # feature: observability — vendor-neutral OTLP ingest point. Exports to `debug` (its own
+  # stdout) until a backend is added with /docker-architect (Jaeger, or Grafana + Tempo +
+  # Prometheus).
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.160.0
+    command: ["--config=/etc/otel-collector-config.yml"]
+    ports:
+      - "${OTLP_HTTP_PORT:-4318}:4318"
+    volumes:
+      - ./docker/init/otel-collector/otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+
+  # chained from sonarqube-setup — no existing server, so local analysis runs here.
+  # Community edition, embedded H2 on purpose: no SONAR_JDBC_URL means the image uses its
+  # built-in database. H2 is evaluation-grade (no upgrade path); fine for local analysis,
+  # wrong for a shared server — a team server is an external one.
+  sonarqube:
+    image: sonarqube:26.9.0.129388-community
+    environment:
+      # Elasticsearch's bootstrap checks fail on hosts with a low vm.max_map_count (most
+      # Linux defaults). Dev-only relief; never on a shared server.
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    ports:
+      - "${SONAR_PORT:-9000}:9000"
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-extensions:/opt/sonarqube/extensions
+      - sonarqube-logs:/opt/sonarqube/logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  postgres-data:
+  sonarqube-data:
+  sonarqube-extensions:
+  sonarqube-logs:

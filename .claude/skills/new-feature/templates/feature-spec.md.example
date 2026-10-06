@@ -1,0 +1,213 @@
+---
+status: draft
+---
+
+# UC-001 — Create user
+
+Consolidated spec. Recipient: `java-spring-boot-developer`.
+
+**Consolidated by reference.** Each block below holds only the final decisions — one
+value per fact, after divergences were resolved — and points to the partial that details
+it. The partial is read for detail; where a block here and its partial disagree, **this
+file wins** and the losing value is listed in § Resolved divergences.
+
+| Partial | Owner | Status |
+|---|---|---|
+| `00-caso-de-uso.md` | `use-case-design` | ✅ |
+| `10-dominio.md` | `domain-modeling` | ✅ |
+| `30-rest.md` | `rest-api-architect` | ✅ |
+| `32-seguranca.md` | `security-architect` | ✅ |
+| `28-cliente-http.md` | `http-client-architect` | — not applicable (no port of kind `external HTTP`) |
+| `20-persistencia.md` | `persistence-architect` | ✅ |
+| `25-mensageria.md` | `messaging-architect` | — not applicable (no external delivery) |
+| `35-jobs.md` | `jobs-architect` | — not applicable (no Form B, no scheduled trigger) |
+| `40-testes.md` | `test-architect` | ✅ |
+
+---
+
+## 1. Use case
+
+Detail: `00-caso-de-uso.md`.
+
+| Decision | Value |
+|---|---|
+| Trigger | HTTP, inbound REST adapter |
+| Side effects | 1 — `INSERT` into `users` |
+| Transaction | opens at the use case, closes before the response |
+| Repetition | the same email never creates a second user |
+
+---
+
+## 2. Domain model — implement first
+
+Detail: `10-dominio.md` § 1-4.
+
+| Decision | Value |
+|---|---|
+| Aggregate | `User` — identity `UserId` (UUID v7, generated in the domain) |
+| Value objects | `UserId`, `Email` |
+| Use case | port `CreateUserUseCase` + `CreateUserService` (hexagonal vocabulary) |
+| Output ports | `UserRepository` — `save`, `existsByEmail` |
+| Exceptions | `ConflictException` with `errorCode` `EMAIL_ALREADY_USED`; `ValidationException` |
+| Events | none |
+
+---
+
+## 3. Persistence — implement after 2
+
+Detail: `20-persistencia.md` § 1-5. Migration SQL: § 4 of that partial — the executor
+materializes it verbatim.
+
+| Decision | Value |
+|---|---|
+| Table | `users`, one per aggregate root |
+| Business key | `UNIQUE (email)` |
+| Concurrency | `@Version` optimistic lock |
+| Migration | `V3__create_users.sql` — `<N>` re-checked on disk at implementation |
+| Shared tables | `idempotency_keys` — NEW (first creation `POST` of the project) |
+
+---
+
+## 3.3 Outbound HTTP — conditional, implement after 2
+
+none — `10-dominio.md` declares no port of kind `external HTTP`. When present: one line per
+dependency (client, engine, read timeout, retrying layer, authentication scheme), the shared
+setup NEW / REUSE, and the dependencies of `28-cliente-http.md` § 8 — detail in
+`28-cliente-http.md`. Implemented by the executor's Block H, right after Block 2.
+
+---
+
+## 3.5 Messaging — conditional
+
+none — `10-dominio.md` names no external delivery.
+
+---
+
+## 3.6 Jobs — conditional
+
+none — no Form B outbox, no scheduled trigger. When present: technology, one line per job
+(trigger, cadence property, inbound port called, coordination), the replica count, and the
+dependencies of `35-jobs.md` § 7 — detail in `35-jobs.md`. Implemented by the executor's
+Block J, after Block M.
+
+---
+
+## 4. REST API — implement after 2
+
+Detail: `30-rest.md` § 1-5.
+
+| Decision | Value |
+|---|---|
+| Endpoint | `POST /api/v1/users` → `201` + `Location` |
+| Errors | malformed payload `400` · email in use `409` · unexpected `500` with `traceId` |
+| Idempotency | `Idempotency-Key` required |
+| Pagination | none — no collection |
+| Dependencies | springdoc (version already in `pom.xml`), tracing bridge, validation |
+
+---
+
+## 4.5 Security — conditional, implement right after 4
+
+Detail: `32-seguranca.md` § 1-10. When step 3b was skipped: `none` and the skip row — e.g.
+"authenticated, covered by the chain's deny-by-default".
+
+| Decision | Value |
+|---|---|
+| Mechanism | OAuth2 resource server, signed token — NEW (first secured case) |
+| Access | `POST /api/v1/users` → role `USER_ADMIN`, method security on the controller |
+| Public paths | OpenAPI document and UI; `/actuator/health`, `/actuator/info` — reasons in § 1 |
+| Ownership | none |
+| Failures | no token `401` + `WWW-Authenticate` · without `USER_ADMIN` `403` |
+| Setup | `SecurityConfig`, `JwtResourceServerConfig`, Problem Details handlers, `SecurityExceptionHandler`, `Roles` — all NEW |
+| Dependencies | `spring-boot-starter-security`, `spring-boot-starter-security-oauth2-resource-server` — managed by the Boot parent |
+
+Implemented by the executor's Block S.
+
+---
+
+## 5. Tests — validates 1-4
+
+Detail: `40-testes.md` § 1-5.
+
+| Decision | Value |
+|---|---|
+| Unit | `User`, `Email`, `CreateUserService` |
+| Slice | `UserController` — `@WebMvcTest`, one case per status in § 4 |
+| Integration | `UserRepositoryAdapter` against a real database (Testcontainers) |
+| Coverage gate | 80% lines / 70% branches |
+| Test dependencies | none — `40-testes.md` § 5. When present, one row each, applied by the executor |
+
+---
+
+## Design patterns
+
+none
+
+Collected from the same section of every partial — the classes each row creates are already
+in the block of the layer that decided it. The executor implements these rows; it adopts no
+other pattern except for a symptom already on disk.
+
+| Force or symptom | Pattern | Classes and interfaces | Decided in |
+|---|---|---|---|
+
+---
+
+## Impact on approved use cases
+
+none
+
+Collected from the same section of every partial. One row per change to code an
+approved case produced; the approved specs themselves are never edited.
+
+| Approved case | Change | Decided in |
+|---|---|---|
+
+---
+
+## Implementation order (checklist)
+
+Fixed at 19 steps, the executor's checkpoints. A step this case doesn't need is marked
+`n/a` with the reason — never deleted.
+
+[ ] 1. Domain exceptions (`10-dominio.md` § 2)
+[ ] 2. Value objects + constructor validation
+[ ] 3. Aggregate + invariants
+[ ] 4. Events — n/a, none
+[ ] 5. Use case command
+[ ] 6. Use case (port and implementation per the blueprint vocabulary)
+[ ] 7. Output ports
+[ ] 8. Migration — materialize from `20-persistencia.md` § 4
+[ ] 9. Persistence entity
+[ ] 10. Spring Data interface
+[ ] 11. Repository adapter
+[ ] 12. Persistence properties
+[ ] 13. DTOs + manual mapper
+[ ] 14. Controller + contract interface + `ApiExceptionHandler`
+[ ] 15. Idempotency interceptor + `IdempotentExecution` wiring (first time: store + component) + REST properties
+[ ] 16. Test fixtures
+[ ] 17. Unit tests
+[ ] 18. Integration + contract tests
+[ ] 19. `./mvnw verify` — green build, coverage gate
+
+---
+
+## Resolved divergences
+
+Audit only. **The blocks above already carry the winning value** — whoever implements
+doesn't need to read this section. One line per fact that two partials fixed
+differently; empty when there were none.
+
+| Fact | Discarded value | Adopted value | Decided by |
+|---|---|---|---|
+| Invalid payload status | `422` (`00-caso-de-uso.md`) | `400` | `30-rest.md` — `422` is reserved for business-rule violations |
+
+<!--
+HOW TO USE THIS:
+- Written by /new-feature at consolidation into docs/use-cases/UC-NNN-<slug>/UC-NNN-spec.md,
+  with `status: draft`. Only /new-feature changes it to `approved`; only the executor to
+  `implemented`.
+- By reference: never copy a partial's tables, SQL, or code here. A block holds the
+  decisions an implementer needs to not misread the partial, and the partial's path.
+  Copying the partials doubled the output in a real run and gained nothing.
+- Every block is present. A block that doesn't apply says "none" and why.
+-->

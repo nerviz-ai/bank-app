@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.1</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>dev.nerviz</groupId>
+	<artifactId>bank-app</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>bank-app</name>
+	<description/>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>21</java.version>
+		<!-- Resolved at runtime (curl to Maven Central), never from memory. -->
+		<spotless.version>3.10.3</spotless.version>
+		<checkstyle.plugin.version>3.6.0</checkstyle.plugin.version>
+		<checkstyle.version>14.3.0</checkstyle.version>
+		<!-- The Spring Boot parent does NOT manage this one — verified empty against its
+		     dependencyManagement. Without a pinned version here, Maven resolves whatever's
+		     newest at build time: unpinned, non-reproducible. -->
+		<jacoco.version>0.8.15</jacoco.version>
+
+		<!-- SonarQube — resolved at runtime from repo1.maven.org maven-metadata.xml, never
+		     from memory. No token here, ever: the scanner reads SONAR_TOKEN from the
+		     environment on its own. -->
+		<sonar.plugin.version>5.8.0.7211</sonar.plugin.version>
+		<sonar.projectKey>dev.nerviz:bank-app</sonar.projectKey>
+		<!-- Local container, added to docker-compose.yml by docker-architect. -->
+		<sonar.host.url>http://localhost:9000</sonar.host.url>
+		<!-- No sonar.coverage.jacoco.xmlReportPaths: the scanner's default,
+		     target/site/jacoco/jacoco.xml, is exactly where the jacoco-maven-plugin
+		     `report` execution writes. -->
+		<!-- Findings accepted by design in code the framework's own templates ship, one
+		     entry each, scoped by rule AND file — never a rule switched off project-wide.
+		     Each Java template carries a comment pointing back here; remove the entry
+		     together with the code it covers. A file that doesn't exist in this project
+		     matches nothing.
+		       s2326 · IdempotentOutcome<R>: R exists so Executed<R> and Replayed<R> share
+		               one sealed type; the interface body never names it.
+		       s112  · IdempotencyAspect#aroundIdempotent declares `throws Throwable`
+		               because ProceedingJoinPoint#proceed() does — the Checkstyle
+		               IllegalThrows suppression in checkstyle.xml covers the same line. -->
+		<sonar.issue.ignore.multicriteria>s2326,s112</sonar.issue.ignore.multicriteria>
+		<sonar.issue.ignore.multicriteria.s2326.ruleKey>java:S2326</sonar.issue.ignore.multicriteria.s2326.ruleKey>
+		<sonar.issue.ignore.multicriteria.s2326.resourceKey>**/IdempotentOutcome.java</sonar.issue.ignore.multicriteria.s2326.resourceKey>
+		<sonar.issue.ignore.multicriteria.s112.ruleKey>java:S112</sonar.issue.ignore.multicriteria.s112.ruleKey>
+		<sonar.issue.ignore.multicriteria.s112.resourceKey>**/IdempotencyAspect.java</sonar.issue.ignore.multicriteria.s112.resourceKey>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- feature: openapi — not in the Initializr catalog, added by hand (step 3) -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>3.1.1</version>
+		</dependency>
+
+		<!-- feature: observability — not in the Initializr catalog, added by hand (step 3).
+		     The bridge and the exporter alone register no Tracer bean; the Boot glue starter
+		     is what registers it on Spring Boot 4. -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-tracing-bridge-otel</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.opentelemetry</groupId>
+			<artifactId>opentelemetry-exporter-otlp</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-opentelemetry</artifactId>
+		</dependency>
+
+		<!-- feature: uuid-v7 — not in the Initializr catalog, added by hand (step 3).
+		     persistence.md requires UUID v7 for primary keys; JDK 21's
+		     java.util.UUID.randomUUID() only generates v4. -->
+		<dependency>
+			<groupId>com.fasterxml.uuid</groupId>
+			<artifactId>java-uuid-generator</artifactId>
+			<version>5.2.0</version>
+		</dependency>
+
+		<!-- Inherited by every package, domain included. No <version>: the Spring Boot
+		     parent pins it. `optional` keeps it out of the classpath of anything depending on
+		     this project, and the annotations used have SOURCE retention — no Lombok reaches
+		     the published bytecode. That's why it doesn't count as a framework under
+		     rules/architecture-ddd.md § Domain. What can be generated with it is in
+		     rules/lombok.md; @Data and @Setter are forbidden and the root lombok.config
+		     breaks the build for whoever uses them. -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<pluginManagement>
+			<plugins>
+				<!-- Used by the format.sh hook. Without this, the hook does nothing. -->
+				<plugin>
+					<groupId>com.diffplug.spotless</groupId>
+					<artifactId>spotless-maven-plugin</artifactId>
+					<version>${spotless.version}</version>
+					<configuration>
+						<java>
+							<!-- DO NOT use googleJavaFormat: it requires add-exports to
+							     jdk.compiler on JDK 16+, and the format hook runs on every
+							     Write/Edit — it would always fail. -->
+							<palantirJavaFormat/>
+							<removeUnusedImports/>
+						</java>
+					</configuration>
+					<executions>
+						<!-- `check` at `verify`, over src/main and src/test: the format hook's
+						     `spotless:apply` misses any file written outside Write/Edit, and an
+						     unused import (Sonar java:S1128) is a formatting failure here. Never
+						     `validate`: the edit-time compile check runs `test-compile` in
+						     parallel with the format hook, and would fail on a file the
+						     formatter has not reached yet. -->
+						<execution>
+							<id>spotless-check</id>
+							<phase>verify</phase>
+							<goals>
+								<goal>check</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
+
+				<!-- Mechanical half of rules/code-quality.md: length, parameters, complexity,
+				     nesting, magic numbers. What Checkstyle catches isn't up for debate in
+				     review. -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-checkstyle-plugin</artifactId>
+					<version>${checkstyle.plugin.version}</version>
+					<dependencies>
+						<!-- The plugin brings an old Checkstyle by default; this override pins
+						     the tool's version, not just the plugin's. -->
+						<dependency>
+							<groupId>com.puppycrawl.tools</groupId>
+							<artifactId>checkstyle</artifactId>
+							<version>${checkstyle.version}</version>
+						</dependency>
+					</dependencies>
+					<configuration>
+						<!-- Absolute via ${maven.multiModuleProjectDirectory}, not relative: a
+						     relative path resolves at the root and fails in every submodule. -->
+						<configLocation>${maven.multiModuleProjectDirectory}/config/checkstyle/checkstyle.xml</configLocation>
+						<includeTestSourceDirectory>false</includeTestSourceDirectory>
+						<consoleOutput>true</consoleOutput>
+						<failOnViolation>true</failOnViolation>
+						<violationSeverity>error</violationSeverity>
+					</configuration>
+					<executions>
+						<execution>
+							<id>checkstyle-validate</id>
+							<phase>validate</phase>
+							<goals>
+								<goal>check</goal>
+							</goals>
+						</execution>
+						<!-- src/test, with its own light rule set (checkstyle-test.xml): the
+						     size limits above don't fit test code, and the execution above
+						     never reads it. `verify`, not `validate`: at `validate` the
+						     edit-time compile check would pay this second run on every Java
+						     edit. Its own `cacheFile`: sharing the default one with a different
+						     config invalidates both on every run. -->
+						<execution>
+							<id>checkstyle-test</id>
+							<phase>verify</phase>
+							<goals>
+								<goal>check</goal>
+							</goals>
+							<configuration>
+								<configLocation>${maven.multiModuleProjectDirectory}/config/checkstyle/checkstyle-test.xml</configLocation>
+								<sourceDirectories>
+									<sourceDirectory>${project.build.testSourceDirectory}</sourceDirectory>
+								</sourceDirectories>
+								<includeResources>false</includeResources>
+								<cacheFile>${project.build.directory}/checkstyle-test-cachefile</cacheFile>
+							</configuration>
+						</execution>
+					</executions>
+				</plugin>
+
+				<!-- In pluginManagement, not <plugins>: it binds to no phase, so `verify`
+				     never reaches a server. The version declared here is what makes the
+				     short `sonar:sonar` resolve to this plugin at this version:
+				     ./mvnw -B verify sonar:sonar -->
+				<plugin>
+					<groupId>org.sonarsource.scanner.maven</groupId>
+					<artifactId>sonar-maven-plugin</artifactId>
+					<version>${sonar.plugin.version}</version>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>com.diffplug.spotless</groupId>
+				<artifactId>spotless-maven-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-checkstyle-plugin</artifactId>
+			</plugin>
+
+			<!-- rules/naming.md separates <Class>Test (unit, surefire) from <Class>IT
+			     (integration, failsafe). Surefire doesn't pick up the IT suffix, and
+			     spring-boot-starter-parent manages failsafe's version but doesn't wire up any
+			     execution. Without this block the *IT's don't run anywhere. No <version>:
+			     the Spring Boot parent pins it. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-failsafe-plugin</artifactId>
+				<executions>
+					<execution>
+						<goals>
+							<goal>integration-test</goal>
+							<goal>verify</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Coverage: instrumentation and report, no gate. The limits in rules/testing.md
+			     (80% lines, 70% branches) only make sense over code that exists, and a freshly
+			     generated project has none — the test-architect skill's setup mode adds the
+			     coverage gate, in the same pass that installs ArchUnit. <version> IS required
+			     here, unlike failsafe above: the Spring Boot parent manages failsafe's version
+			     but not JaCoCo's. -->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>${jacoco.version}</version>
+				<configuration>
+					<excludes>
+						<!-- Startup and configuration classes: structure with no branches. -->
+						<exclude>**/*Application.class</exclude>
+						<exclude>**/config/**</exclude>
+						<exclude>**/*Config.class</exclude>
+						<exclude>**/*Configuration.class</exclude>
+					</excludes>
+				</configuration>
+				<executions>
+					<execution>
+						<id>prepare-agent</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>

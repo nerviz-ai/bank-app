@@ -1,0 +1,93 @@
+---
+paths:
+  - ".claude/rules/**"
+# Loads when a rule is read or edited; everyone else cites it. Without `paths` it
+# would load at launch, in every session.
+status: active
+---
+
+# Rule index
+
+Each topic has **one** owning file. Whoever needs it cites the path
+(`@.claude/rules/<file>.md`) and never reproduces the content. A rule written in two
+places diverges — treat that as a bug.
+
+This file contains no rules. It contains the map of who covers what, the loading
+mechanism, and the list of what is still missing. Each rule's globs live in that file's
+own `paths`; they are not repeated here.
+
+## How a rule enters context
+
+Two paths, and both apply to every rule:
+
+1. **Auto-loading via `paths`** — the frontmatter declares globs and the rule enters
+   context on its own when matching files are touched. It doesn't depend on anyone
+   remembering to read it.
+2. **Explicit citation** — whoever designs something the rule governs, before the file
+   exists, cites the path.
+
+**Every rule declares `paths`.** A rule without it is not "citation only": the runtime
+loads it at launch, in every session, whatever the session touches. A cross-cutting rule
+still gets the narrowest glob that holds its territory — this index loads on
+`.claude/rules/**`.
+
+Java globs are `**/src/**/*.java`, never `**/*.java`: the second matches
+`.claude/hooks/ArchHook.java`, which is no application code and would pull every Java norm
+into context on each read of the hook.
+
+## Rules written
+
+| File | Covers | Verified by |
+|---|---|---|
+| `architecture-ddd.md` | Universal DDD + layers, dependency direction, boundaries | `hooks/ArchHook.java check` |
+| `naming.md` | Packages, classes, methods, tests, files | Review |
+| `code-quality.md` | OCP, LSP, ISP + Clean Code limits (size, complexity, `null`, comments) | Checkstyle (`validate`) + ArchUnit in the generated project |
+| `error-handling.md` | Domain exception taxonomy (transport-agnostic) | Contract tests |
+| `api-rest.md` | Resources and versioning, verb semantics, success status, 4xx/5xx errors (Problem Details), pagination, idempotency, OpenAPI | OpenAPI + contract tests |
+| `lombok.md` | Which Lombok annotations may be generated: `@Data` and `@Setter` forbidden, `@Getter` only with an immutable return, `@FieldDefaults` mandatory | `lombok.config` (`flagUsage = ERROR`, at compile time) + review for the `@Getter` condition |
+| `value-objects.md` | When a domain field becomes a value object and when it stays a primitive: criteria, catalog (email, phone, CPF/CNPJ, document, money, percentage, id) and counter-catalog (`name`, `description`, `comments`) | Review |
+| `persistence.md` | Adapter boundary, JPA mapping, identity and keys, versioned and immutable migrations, N+1 and pagination, datasource configuration | `grep` from § How to verify + integration tests |
+| `testing.md` | Pyramid and levels, slices and context, doubles, names and shape, test data, database engine in integration tests, coverage gate (80% lines / 70% branches), architecture tests | `./mvnw verify` (failsafe + JaCoCo) + ArchUnit |
+| `observability.md` | Vendor integration for tracing (correlation identifier origin) and metrics (cardinality, health endpoint, vendor annotations) | Contract tests + context startup |
+| `logging.md` | `logback.xml` default pattern, log format and level semantics, sensitive data masked or kept out of logs, per-class-type log content | Review |
+| `messaging.md` | Kafka producer/consumer boundary, delivery semantics (at-least-once, idempotent consumer), topic naming and serialization, retry/DLQ, consumer configuration | `grep` from § How to verify + integration tests |
+| `scheduling.md` | Jobs on their own clock: trigger as a driving adapter, fixed delay vs rate, cron zone, on/off property off in tests, pool size, coordination across instances and lock bounds, missed runs, bounded passes, last-success metric, retention enforced by a job | `grep` from § How to verify + unit tests through the inbound port |
+| `personal-data.md` | Personal data at rest and in transit: what counts as personal data, payload columns and retention, the minimum a receiver needs, the recorded decision when a value must cross in clear | `grep` from § How to verify + the design record it requires |
+| `authorization.md` | Authentication and authorization at the entry boundary, servlet stack: where each check lives (roles at the boundary, ownership in the use case), deny by default and the public exceptions, one mechanism per kind of caller and what each must validate, stateless/CSRF/CORS/headers, 401 and 403 bodies, credentials kept out of files and logs, the three-way endpoint proof | `grep` from § How to verify + contract tests through the real filter chain |
+| `http-client.md` | Calling another service over HTTP: outbound adapter boundary and tolerant reader, client choice, engine and pool pinned, explicit timeouts, one retrying layer and the retry allowlist, failures mapped by "was the request sent?", resilience, outbound credentials, TLS and SSRF, bounded consumption, URI templates, tests against a real socket | `grep` from § How to verify + integration tests against a stub server |
+| `transport-security.md` | Inbound transport: where TLS terminates (edge, direct, mutual TLS, mesh), forwarded headers and the trusted proxy list, the SSL bundle and its reload, profile-gated TLS, TLS 1.3/1.2 and JDK ciphers, HTTP/2 and its abuse limits, HSTS with exactly one writer, automatic renewal and the `ssl` health indicator kept out of readiness, tests against a real server | `grep` from § How to verify + integration tests against a real server |
+| `secrets.md` | Where a secret may live: never in a versioned file, placeholders without defaults, nothing baked into an image, key material mounted at run time and generated by tests, configuration types that never print a secret, rotation before history cleanup | `grep` from § How to verify + review |
+
+`personal-data.md` loads on every Java source and every migration, not on one boundary
+package: the field that leaked was decided in a domain event, and its name did not say what
+it held. It is also cited by path wherever a payload is designed. Secrets are a separate
+topic, `secrets.md`, which loads on every source and configuration file for the same reason:
+the norm that a credential stays out of a versioned file used to be restated in four boundary
+norms, and now each of them cites it.
+
+`architecture-ddd.md` carries the `paths` fixed at generation time from blueprint
+`clean-architecture-single-module`. Changing it by hand disables the auto-loading of that rule.
+
+The rules whose territory is a package — `api-rest.md`, `persistence.md`,
+`value-objects.md`, `observability.md`, `messaging.md` — had their `paths` written at
+generation time from blueprint `clean-architecture-single-module`, and they name this project's packages.
+A glob edited by hand to a package that does not exist leaves the rule unloaded, in
+silence.
+
+## Planned rules (file does not exist yet)
+
+Do not cite these by path — there is nothing to load. If you need one, write it before
+using it; don't improvise it inside another file.
+
+| File | Will cover | Expected `paths` |
+|---|---|---|
+| `git-workflow.md` | Branches, commit messages, PRs | narrowest glob that holds it — without one it loads at launch |
+
+## States
+
+`status: active` applies now · `status: draft` is a proposal, do not apply ·
+`status: deprecated` is kept for reading old code, do not use in new code.
+
+The runtime does not read `status`. A `draft` rule under `rules/` still loads whenever its
+`paths` match and reads as a norm like any other, so a proposal stays out of this folder
+until it is `active`.

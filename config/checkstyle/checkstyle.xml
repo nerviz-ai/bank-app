@@ -1,0 +1,208 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  Each module here corresponds to ONE limit written in .claude/rules/code-quality.md.
+  Don't add style checks (imports, braces, spacing): Spotless handles that,
+  and a duplicate check gives a red build over something the formatter would already fix.
+
+  If you change a number here, change it in the rule too — and vice versa. A divergence
+  between the two is a bug: the rule tells the model one thing and the build enforces another.
+
+  Severity `error` on purpose: the POM has violationSeverity=error and Checkstyle runs
+  in the `validate` phase, so a violation breaks the build before compiling.
+-->
+<module name="Checker">
+  <property name="severity" value="error"/>
+  <property name="charset" value="UTF-8"/>
+
+  <!-- Generated files and exemplars are excluded -->
+  <module name="BeforeExecutionExclusionFileFilter">
+    <property name="fileNamePattern" value="[\\/](target|generated-sources)[\\/].*$"/>
+  </module>
+
+  <!-- code-quality.md: class ≤ 200 lines -->
+  <module name="FileLength">
+    <property name="max" value="200"/>
+  </module>
+
+  <!-- code-quality.md § Comments: Javadoc is the only comment. A `//` on a line of its own
+       is a violation unless it is a tool directive, or the single line of an otherwise
+       empty body (previous line ends in `{`, next line starts with `}` — EmptyBlock below
+       requires that text). Read over the raw file, outside the TreeWalker, because the
+       exception is about the lines around the comment. The look-behind is bounded
+       ({0,40}) because Java's regex engine refuses an unbounded one. -->
+  <module name="RegexpMultiline">
+    <property name="id" value="LineComment"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="format"
+              value="^(?:(?&lt;!\{[ \t]{0,40}\r?\n)|(?=[^\r\n]*\r?\n(?![ \t]*\})))[ \t]*//(?![ \t]*(?:NOSONAR|CHECKSTYLE:(?:OFF|ON)|spotless:(?:off|on)|@formatter:(?:off|on))\b)"/>
+    <property name="message"
+              value="code-quality.md § Comments: Javadoc is the only comment. Rename, extract a method, or move the reason into the Javadoc of the method."/>
+  </module>
+
+  <!-- code-quality.md § Comments: a block comment on a line of its own. `/**` is Javadoc
+       and passes; one after code is TrailingComment's. Only at line start: "/api/*" in a
+       string literal must not match. -->
+  <module name="RegexpMultiline">
+    <property name="id" value="BlockComment"/>
+    <property name="fileExtensions" value="java"/>
+    <property name="format" value="^[ \t]*/\*(?!\*)"/>
+    <property name="message"
+              value="code-quality.md § Comments: Javadoc is the only comment. Turn /* */ into Javadoc on the type or method, or remove it."/>
+  </module>
+
+  <module name="TreeWalker">
+
+    <!-- code-quality.md: method ≤ 20 lines -->
+    <module name="MethodLength">
+      <property name="max" value="20"/>
+      <property name="countEmpty" value="false"/>
+    </module>
+
+    <!-- code-quality.md: ≤ 3 parameters. Injection constructor is exempt — the
+         dependency limit is a review decision, not a count (see § Composition in
+         architecture-ddd.md). -->
+    <module name="ParameterNumber">
+      <property name="max" value="3"/>
+      <property name="tokens" value="METHOD_DEF"/>
+    </module>
+
+    <!-- Static factory of an aggregate or value object is exempt from ParameterNumber.
+         An aggregate with four required fields has no way to receive them in three
+         parameters without inventing a grouping the domain doesn't have, and naming.md requires
+         construction to go through a factory (`of`, `from`, `create`) instead of a public
+         constructor — the limit would punish exactly the shape the rule mandates using.
+         The name list is the one from `.claude/rules/naming.md` § Classes and methods.
+         The union in the query covers the two nodes where Checkstyle anchors this violation
+         depending on version (the METHOD_DEF or its IDENT). -->
+    <module name="SuppressionXpathSingleFilter">
+      <property name="checks" value="ParameterNumber"/>
+      <property name="query"
+                value="//METHOD_DEF[MODIFIERS/LITERAL_STATIC and IDENT[@text='of' or @text='from' or @text='create' or @text='rehydrate' or @text='register']]
+                     | //METHOD_DEF[MODIFIERS/LITERAL_STATIC]/IDENT[@text='of' or @text='from' or @text='create' or @text='rehydrate' or @text='register']"/>
+    </module>
+
+    <!-- code-quality.md: cyclomatic complexity ≤ 10 -->
+    <module name="CyclomaticComplexity">
+      <property name="max" value="10"/>
+    </module>
+
+    <!-- code-quality.md: nesting ≤ 2 levels -->
+    <module name="NestedIfDepth">
+      <property name="max" value="2"/>
+    </module>
+    <module name="NestedForDepth">
+      <property name="max" value="2"/>
+    </module>
+    <module name="NestedTryDepth">
+      <property name="max" value="1"/>
+    </module>
+
+    <!-- code-quality.md: no magic numbers or strings -->
+    <module name="MagicNumber">
+      <property name="ignoreAnnotation" value="true"/>
+      <property name="ignoreHashCodeMethod" value="true"/>
+    </module>
+    <!-- code-quality.md: the string half. Sonar S1192's numbers exactly: flagged on the
+         third occurrence in a file, literals under 5 characters and those inside
+         annotations ignored. Production only, like S1192, which skips test files. -->
+    <module name="MultipleStringLiterals">
+      <property name="id" value="MultipleStringLiterals"/>
+      <property name="allowedDuplicates" value="2"/>
+      <property name="ignoreStringsRegexp" value='^".{0,4}"$'/>
+    </module>
+
+    <!-- code-quality.md: guard clause first, no else after return -->
+    <module name="AvoidNestedBlocks"/>
+    <module name="EmptyBlock">
+      <property name="option" value="text"/>
+    </module>
+
+    <!-- code-quality.md: hidden side effect / dead code -->
+    <module name="EqualsHashCode"/>
+    <module name="ModifiedControlVariable"/>
+    <module name="MissingSwitchDefault"/>
+    <module name="FallThrough"/>
+
+    <!-- error-handling.md: never generic. ArchUnit catches the `throw`;
+         this one catches the `catch (Exception e)` that swallows everything. -->
+    <module name="IllegalCatch">
+      <property name="illegalClassNames"
+                value="java.lang.Exception, java.lang.RuntimeException, java.lang.Throwable"/>
+    </module>
+    <module name="IllegalThrows">
+      <property name="illegalClassNames"
+                value="java.lang.Exception, java.lang.RuntimeException, java.lang.Throwable"/>
+    </module>
+
+    <!-- rest-api-architect's IdempotencyAspect.java.example (2nd+ `@Idempotent`
+         endpoint): `aroundIdempotent` declares `throws Throwable` because
+         `org.aspectj.lang.ProceedingJoinPoint#proceed()` does — that's the AspectJ API's
+         own contract, not a choice made in this file. Scoped to that one class only, so
+         a `throws Throwable` anywhere else in the project still fails the build. -->
+    <module name="SuppressionXpathSingleFilter">
+      <property name="checks" value="IllegalThrows"/>
+      <property name="files" value="IdempotencyAspect\.java"/>
+      <property name="query" value="//LITERAL_THROWS//IDENT[@text='Throwable']"/>
+    </module>
+
+    <!-- Same file, same reason in reverse: `proceedUnchecked` catches `Throwable` for
+         exactly as long as it takes to cross the `Supplier<R>` boundary in
+         `IdempotentExecution.execute`, then rethrows the original cause unwrapped
+         (`IdempotencyAspect.java.example`'s header comment). Scoped to that one method's
+         catch, not a blanket per-file disable. -->
+    <module name="SuppressionXpathSingleFilter">
+      <property name="checks" value="IllegalCatch"/>
+      <property name="files" value="IdempotencyAspect\.java"/>
+      <property name="query" value="//METHOD_DEF[IDENT[@text='proceedUnchecked']]//LITERAL_CATCH//IDENT[@text='Throwable']"/>
+    </module>
+
+    <!-- code-quality.md § Comments: no comment after code on the same line. `format` is
+         what may stand before the comment — whitespace only, so `} // end` is caught too
+         (the default lets `}` and `);` through). A tool directive is the exception. -->
+    <module name="TrailingComment">
+      <property name="format" value="^\s*$"/>
+      <property name="legalComment" value="^\s*(NOSONAR|CHECKSTYLE:(OFF|ON)|spotless:(off|on)|@formatter:(off|on))\b"/>
+      <message key="trailing.comments"
+               value="code-quality.md § Comments: Javadoc is the only comment. Rename, extract a method, or move the reason into the Javadoc of the method."/>
+    </module>
+
+    <!-- code-quality.md § Comments: no /** */ inside a body — it is Javadoc of nothing -->
+    <module name="InvalidJavadocPosition">
+      <message key="invalid.position"
+               value="code-quality.md § Comments: Javadoc goes on a type, method or field, never inside a body. Extract a method and document it."/>
+    </module>
+
+    <!-- code-quality.md § Comments: no TODO in any form, Javadoc included — the work it
+         names belongs in the issue tracker -->
+    <module name="TodoComment">
+      <property name="format" value="\bTODO\b"/>
+      <message key="todo.match"
+               value="code-quality.md § Comments: no TODO in code. Open an issue for the work and remove the comment."/>
+    </module>
+
+    <!-- naming.md: the rule file is the owner; here only what's mechanical -->
+    <module name="PackageName">
+      <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+    </module>
+    <module name="TypeName"/>
+    <module name="MethodName"/>
+
+    <!-- naming.md § Restricted identifiers. The `format` is explicit on purpose: Checkstyle
+         14's default, `^(?!var$|\S*\$)\S+$`, rejects `var` only and lets `record` through.
+         Keep this value identical to the one in checkstyle-test.xml. -->
+    <module name="IllegalIdentifierName">
+      <property name="format" value="^(?!(record|yield|var|permits|sealed|when)$|\S*\$)\S+$"/>
+    </module>
+
+    <!-- lowercase `log` is allowed alongside SCREAMING_SNAKE_CASE. It's the name SLF4J uses
+         throughout its documentation and in practically all Java code anyone writes by
+         hand; requiring `LOG` here would break the build over a convention nobody follows.
+         Every other constant still follows the usual format. -->
+    <module name="ConstantName">
+      <property name="format" value="^(log|[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)$"/>
+    </module>
+  </module>
+</module>

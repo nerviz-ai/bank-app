@@ -1,0 +1,81 @@
+name: build
+
+on:
+  push: { branches: [main] }
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # The GitHub runner has a Docker daemon, so Testcontainers-based tests
+      # actually run here — they aren't skipped like on a machine without Docker.
+      # Checkstyle runs inside verify, in the validate phase.
+      - name: verify
+        run: ./mvnw -B clean verify
+
+      # `.claude/rules/testing.md` § Database in integration tests: the
+      # `@EnabledIf(dockerAvailable)` guard is allowed locally, not in CI. A class the guard
+      # turns off is reported as skipped, not as zero tests, so any skipped IT fails here.
+      # Otherwise `verify` goes green without having touched the database, which is the
+      # silent degradation the rule forbids.
+      #
+      # Keyed off *IT.java source presence: a freshly bootstrapped project has zero *IT
+      # sources, and that state must pass. The counts come from failsafe-summary.xml, one
+      # per module, never from the per-class .txt reports.
+      - name: integration tests actually ran
+        run: |
+          IT_SOURCES=$(find . -path '*/src/test/java/*IT.java' -print -quit)
+          if [ -z "$IT_SOURCES" ]; then
+            echo "ℹ️  No *IT.java sources yet — nothing to verify."
+            exit 0
+          fi
+          SUMMARIES=$(find . -path '*/target/failsafe-reports/failsafe-summary.xml')
+          if [ -z "$SUMMARIES" ]; then
+            echo "❌ *IT.java sources exist but no failsafe-summary.xml. Failsafe isn't wired up"
+            echo "   in the build. In CI that's a failure."
+            exit 1
+          fi
+          count() { sed -n "s:.*<$1>\([0-9]*\)</$1>.*:\1:p" "$2" | head -1; }
+          TOTAL=0; SKIPPED=0
+          while IFS= read -r f; do
+            c=$(count completed "$f"); s=$(count skipped "$f")
+            TOTAL=$((TOTAL + ${c:-0})); SKIPPED=$((SKIPPED + ${s:-0}))
+          done <<< "$SUMMARIES"
+          if [ "$SKIPPED" -gt 0 ]; then
+            echo "❌ $SKIPPED integration test(s) skipped in CI. The Docker guard, @Disabled or an"
+            echo "   assumption turned them off, and a skipped IT proves nothing. Skipped in:"
+            find . -path '*/target/failsafe-reports/TEST-*.xml' \
+              -exec grep -lE '<testsuite [^>]*skipped="[1-9]' {} + \
+              | sed 's:.*/TEST-::; s:\.xml$::; s:^:     :' || true
+            exit 1
+          fi
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "❌ *IT.java sources exist but failsafe ran no integration test."; exit 1
+          fi
+          echo "✅ $TOTAL integration test(s) ran, none skipped."
+
+  boundaries:
+    name: architectural boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Proves enforcement is switched on for this machine, not just declared.
+      - name: doctor
+        run: java .claude/hooks/ArchHook.java doctor

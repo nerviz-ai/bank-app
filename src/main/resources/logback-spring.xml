@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+This file is the mechanical half of .claude/rules/logging.md § logback.xml. The rule
+fixes the pattern and the field; this file is where it actually runs.
+
+traceId is an MDC key. Where the value comes from (tracing bridge vs. generated UUID)
+is .claude/rules/observability.md's decision, not this file's — this file only reserves
+the field's place in the line.
+-->
+<configuration>
+
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="app"/>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%magenta(%d{yyyy-MM-dd HH:mm:ss} app=${appName} [%thread] [%X{traceId}:%X{spanId}]) %cyan(%logger{36}) %highlight(%-5level M=%M, %msg%n)
+            </pattern>
+            <charset>utf8</charset>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+</configuration>

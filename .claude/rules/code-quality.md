@@ -1,0 +1,81 @@
+---
+paths:
+  - "**/src/**/*.java"
+status: active
+---
+
+# Code quality — SOLID and Clean Code
+
+Covers only what no other rule already covers. Layer SRP and DIP live in
+`@.claude/rules/architecture-ddd.md`; names in `@.claude/rules/naming.md`; exceptions in
+`@.claude/rules/error-handling.md`. Don't repeat them here.
+
+## SOLID — what's missing
+
+- **OCP** — behavior that varies by case enters as a new implementation of an existing
+  abstraction, not as a new `if`/`switch` inside the existing one. Applies once the axis
+  has already varied once; before that it's speculation.
+- **LSP** — a subtype doesn't tighten a precondition, doesn't relax a postcondition,
+  doesn't throw where the base doesn't throw. An inherited method that throws
+  `UnsupportedOperationException` is a violation: the hierarchy is wrong, not the
+  caller.
+- **ISP** — the client depends only on what it uses. An interface with methods that half
+  the implementations leave empty splits in two.
+
+## Clean Code — hard limits
+
+- Function: one level of abstraction, ≤ 20 lines, ≤ 3 parameters, cyclomatic complexity
+  ≤ 10. A boolean parameter is forbidden — that's two functions with different names.
+- Class: ≤ 200 lines. Fields: `private final` by default.
+- Guard clause first; no `else` after `return`; nesting ≤ 2 levels.
+- No magic numbers or strings — named constant or value object.
+- No `null` crossing a boundary: `Optional` on a query's return only, never on a field,
+  parameter, or collection. Empty collection, never `null`.
+- Mutability is an explicit decision: `record` or immutable class by default.
+- A hidden side effect is a bug — a function whose name says it queries doesn't write.
+- A `switch` over a sealed type lists every permitted subtype and has **no `default`**:
+  exhaustiveness is the compiler's job, and a `default` switches it off — the next subtype
+  added to `permits` compiles and falls into the `default` in silence. Checkstyle's
+  `MissingSwitchDefault` does not apply to a switch with pattern labels; it never requires
+  that `default`. A switch over an open type (`String`, an enum you don't own, a non-sealed
+  interface) keeps its `default`.
+
+## Comments
+
+Javadoc is the only comment. Code that needs a comment to be understood has the wrong
+name — rename it, or extract a method whose name says what the comment said. A reason
+that must survive the next edit goes in the Javadoc of the type or method it explains. No
+`//` and no `/* */`, on a line of their own or at the end of one, and no `/** */` inside a
+method body.
+
+Two exceptions, and nothing else:
+
+- **An otherwise empty body** — one `//` line saying why it is empty. An empty block with
+  no text is a violation of its own (Sonar S108, S1186). Where a test fixture must carry
+  one, `@.claude/rules/testing.md` says so.
+- **A tool directive** — `// NOSONAR`, `// CHECKSTYLE:OFF`/`ON`, `// spotless:off`/`on`,
+  `// @formatter:off`/`on`. It addresses a tool, not a reader.
+
+Forbidden as well: commented-out code, a `TODO` in any form — the work it names belongs in
+the issue tracker — and Javadoc that repeats the signature.
+
+## How to verify
+
+A rule in markdown doesn't enforce anything. What's mechanical lives in the generated
+project's build:
+
+- **Checkstyle** (`config/checkstyle/checkstyle.xml`, `validate` phase) — length,
+  parameters, complexity, nesting, magic numbers, a string literal of 5 or more characters
+  repeated 3 or more times in one file (outside annotations), generic `catch`, and § Comments: a `//`
+  or `/* */` outside its two exceptions, a `/** */` inside a body, a `TODO`. The numbers
+  and the exceptions in that file and in this rule are the same: changing one side
+  without the other is a bug. Test code has its own light set,
+  `config/checkstyle/checkstyle-test.xml`, at `verify`: these size limits and the comment
+  check apply to production code only — in test code § Comments is held by review. It
+  holds the restricted identifiers and the one-call lambda of
+  `@.claude/rules/testing.md` § Names and shape
+- **Spotless** (`spotless:check` at `verify`; part of `check` in Gradle) — formatting and
+  unused imports, main and test alike
+- **ArchUnit** (`ArchitectureTest.java` in the main module) — boundaries, ISP, `private
+  final` fields in the domain, generic `throw`, field injection
+- Human review only for OCP, LSP, abstraction level, and the boolean parameter

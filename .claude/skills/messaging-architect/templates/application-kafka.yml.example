@@ -1,0 +1,84 @@
+# EXEMPLAR — Kafka producer/consumer configuration.
+# Rules: `.claude/rules/messaging.md` § Delivery semantics, § Configuration
+# Mandatory values come from the rule; sizing (group id, offset reset) is this skill's
+# per-use-case call, fixed in the `25-mensageria.md` partial, not re-decided here.
+#
+# THE DEPENDENCY THAT MAKES THIS FILE DO ANYTHING. Every property below is read by Spring
+# Boot's Kafka autoconfiguration, and in Spring Boot 4 that autoconfiguration is NOT in
+# `spring-boot-autoconfigure` any more — it lives in its own module, pulled by
+# `org.springframework.boot:spring-boot-starter-kafka` (first published at 4.1.0). A plain
+# `org.springframework.kafka:spring-kafka` library dependency therefore wires nothing: no
+# `KafkaTemplate`, no `ProducerFactory`, and this whole block silently inert while a
+# hand-rolled `@Configuration` reads the same keys with `@Value` and squats the framework's
+# own `spring.kafka.*` namespace — lessons-learned-013 § 8.5. Depend on the starter, let the
+# Boot parent manage its version (`@CLAUDE.md` invariant 8: never a version from memory), and
+# keep hand-wiring for what the starter genuinely cannot express.
+# The dependency itself is a DECLARED DEPENDENCY REQUIREMENT in § 7 of the partial — see
+# `messaging-spec.md.example`; the executor applies it, nobody else edits `pom.xml`.
+
+spring:
+  kafka:
+    # Host-first default, and the reason is the one that broke a real run. `docker-compose`
+    # publishes the broker's external listener on the host; the application started with
+    # `./mvnw spring-boot:run` runs ON the host, so this default has to be an address the host
+    # resolves. The `app` service inside compose overrides it with the compose-network address
+    # (`KAFKA_BOOTSTRAP_SERVERS: kafka:9092`), which is where the internal listener answers.
+    # Defaulting to the container-only port instead sends every host-side developer into
+    # `UnknownHostException: kafka` with no way to know why — lessons-learned-013 § 11.
+    # The port here and the EXTERNAL listener in `docker-architect`'s Kafka service block are
+    # one decision in two files; `ArchHook.java compose` fails when they disagree. The port is
+    # `KAFKA_EXTERNAL_PORT`, the variable the service publishes and advertises, read from the
+    # untracked `.env` like the rest of the local overrides.
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:${KAFKA_EXTERNAL_PORT:29092}}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+      retries: 3
+      # THE WIRE CONTRACT — `.claude/rules/messaging.md` § Topics and serialization. The value
+      # is JSON TEXT, turned into text once, by the producer side's adapter: the Form A
+      # publisher right before `send`, Form B's `OutboxAppender` when it writes the row — the
+      # relay then sends that text untouched. So the serializer only moves a `String`, in both
+      # forms, and both forms put the same bytes on the wire.
+      # NOT spring-kafka's `JsonSerializer`: it re-encodes a `String` as a quoted JSON literal
+      # (the relay's payload arrives double-encoded), adds a `__TypeId__` header naming the
+      # PRODUCER's class, and is `@Deprecated(forRemoval = true)` since spring-kafka 4.0.
+      # `JacksonJsonSerializer`, its replacement, has the same first two effects — issue #58.
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Text in, text out: the typed listener parameter is built AFTER this, by the one
+      # `StringJacksonJsonMessageConverter` bean the consumer exemplar declares — Boot's Kafka
+      # autoconfiguration hands a unique `RecordMessageConverter` bean to every
+      # `@KafkaListener`, so no container factory is built by hand. No type header is read and
+      # no `trusted.packages` list exists to keep in sync: the target type is the listener's
+      # own parameter. A payload that doesn't parse fails conversion, which `DefaultErrorHandler`
+      # treats as not retryable — straight to the DLQ, no `ErrorHandlingDeserializer` needed.
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: manual
+      # Backoff: 3 attempts, 1s / 2s / 4s, then DLQ — wired once in a
+      # DefaultErrorHandler + DeadLetterPublishingRecoverer bean, not per @KafkaListener.
+
+# FORM B ONLY — transactional outbox + relay (`.claude/rules/messaging.md` § Publication
+# timing). Omit this whole block under Form A, where there is no relay to configure.
+# Shape of the pass these values drive: `OutboxRelayPublisher.java.example`.
+#
+# ONE `app.outbox` MAP, TWO EXEMPLARS. This block shows only the two keys the relay PASS reads.
+# The switch, the poll interval, the retention window and the prune's keys belong to the same
+# map and are shaped in `jobs-architect/templates/application-jobs.yml.example`. In the
+# project's `application.yml` they are ONE `app:` root with ONE `outbox:` child — merged, never
+# a second `app:` block: YAML takes the last duplicate key silently, or Spring refuses the file.
+app:
+  outbox:
+    # Rows claimed per pass (persistence). Sized so a pass finishes well inside the poll
+    # interval `35-jobs.md` sets.
+    batch-size: 100
+    # Send attempts before the row is flagged dead-lettered and stops being re-read
+    # (persistence). Not the broker-side retry above: that one retries a single send, this one
+    # retries a row.
+    max-attempts: 5

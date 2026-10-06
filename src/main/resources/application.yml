@@ -1,0 +1,90 @@
+# feature: transport-security (topology A · edge) — TLS terminates in front of this
+# application, which speaks HTTP/1.1 or h2c behind it and holds no key. Only the edge's
+# network may say a request arrived over HTTPS: TRUSTED_PROXIES narrows the default
+# (private ranges) to the real edge addresses per environment. Loopback is left out on
+# purpose — a request from the developer's own machine is not a proxy.
+# .claude/rules/transport-security.md § Behind an edge, § Protocols.
+server:
+  http2:
+    enabled: true
+  forward-headers-strategy: native
+  tomcat:
+    redirect-context-root: false
+    remoteip:
+      internal-proxies: ${TRUSTED_PROXIES:10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16}
+
+spring:
+  application:
+    name: bank-app
+
+  # feature: persistence-jpa
+  # The untracked `.env` at the project root: docker compose reads it for the services, and
+  # this import hands the host run (the IDE, `./mvnw spring-boot:run`) the same values, so
+  # `DB_PASSWORD` lives in one place and never in this file (`.claude/rules/secrets.md`).
+  # Optional, so a deployment that sets real environment variables needs no file; those win
+  # over it anyway.
+  config:
+    import: optional:file:.env[.properties]
+  # One set of variables with the compose service, same names and same defaults:
+  # `bank_app` is the artifact name with `-` replaced by `_`. `ArchHook.java compose` warns
+  # when the two disagree.
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME:bank_app}}
+    username: ${DB_USERNAME:bank_app}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # The schema belongs to Flyway. Hibernate never alters it.
+      ddl-auto: validate
+
+  # feature: flyway
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  # feature: pagination — Spring Data doesn't reject an oversized `size` on its own;
+  # without this, api-rest.md's "above the max is 400" contract is unenforced.
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+
+# feature: actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  # feature: observability — the tracing bridge's export destination. Both signals are
+  # declared on purpose: metrics export is on by default the moment
+  # micrometer-registry-otlp is on the classpath, and its default target is
+  # localhost:4318/v1/metrics — from inside the app container, that's the app itself and
+  # never the collector. The defaults are host-first: ./mvnw spring-boot:run runs on the
+  # host, where localhost:4318 is the port the collector service publishes. Inside
+  # compose, the `app` service overrides both variables with otel-collector:4318.
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLE_RATE:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+    metrics:
+      export:
+        url: ${OTLP_METRICS_ENDPOINT:http://localhost:4318/v1/metrics}
+
+# feature: openapi
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    root: INFO
