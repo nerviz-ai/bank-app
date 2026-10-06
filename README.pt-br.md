@@ -28,6 +28,13 @@ Gerado a partir do meta-repo Nerviz, com:
 /init-project
 ```
 
+A execução que o gerou, acelerada cerca de 5×: a entrevista, o agent em background, o
+relatório final e o push para o GitHub.
+
+<p align="center">
+  <img alt="/init-project gerando o bank-app: a entrevista, o agent em background, o relatório final e o push para o GitHub" src="docs/assets/init-project-demo.gif" width="100%">
+</p>
+
 | Parâmetro | Valor |
 |---|---|
 | groupId | `dev.nerviz` |
