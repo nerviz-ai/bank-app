@@ -5,6 +5,21 @@ já preparado para desenvolvimento assistido por IA com Claude Code.
 
 *[English version](README.md)*
 
+## Rodando
+
+Iniciado pela IDE contra o Postgres do compose: o Flyway valida o schema e o Tomcat sobe na
+porta 8080.
+
+<p align="center">
+  <img alt="bank-app subindo na IDE: o Flyway valida o schema e o Tomcat sobe na porta 8080" src="docs/assets/bank-app-run.gif" width="100%">
+</p>
+
+O `./mvnw clean verify` passa com testes, Spotless, Checkstyle e JaCoCo.
+
+<p align="center">
+  <img alt="mvn clean verify no bank-app: 3 testes, 0 violações de Checkstyle, BUILD SUCCESS" src="docs/assets/bank-app-verify.gif" width="100%">
+</p>
+
 ## Origem
 
 Gerado a partir do meta-repo Nerviz, com:
