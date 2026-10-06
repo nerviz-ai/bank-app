@@ -5,6 +5,21 @@ already prepared for AI-assisted development with Claude Code.
 
 *[Versão em português](README.pt-br.md)*
 
+## Running it
+
+Started from the IDE against the compose Postgres: Flyway validates the schema and Tomcat
+starts on port 8080.
+
+<p align="center">
+  <img alt="bank-app starting in the IDE: Flyway validates the schema and Tomcat starts on port 8080" src="docs/assets/bank-app-run.gif" width="100%">
+</p>
+
+`./mvnw clean verify` passes with tests, Spotless, Checkstyle and JaCoCo.
+
+<p align="center">
+  <img alt="mvn clean verify on bank-app: 3 tests, 0 Checkstyle violations, BUILD SUCCESS" src="docs/assets/bank-app-verify.gif" width="100%">
+</p>
+
 ## Origin
 
 Generated from the Nerviz meta-repo, with:
@@ -12,6 +27,13 @@ Generated from the Nerviz meta-repo, with:
 ```
 /init-project
 ```
+
+The run that generated it, sped up about 5×: the interview, the background agent, the final
+report and the push to GitHub.
+
+<p align="center">
+  <img alt="/init-project generating bank-app: the interview, the background agent, the final report and the push to GitHub" src="docs/assets/init-project-demo.gif" width="100%">
+</p>
 
 | Parameter | Value |
 |---|---|
