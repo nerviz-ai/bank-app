@@ -20,6 +20,34 @@ starts on port 8080.
   <img alt="mvn clean verify on bank-app: 3 tests, 0 Checkstyle violations, BUILD SUCCESS" src="docs/assets/bank-app-verify.gif" width="100%">
 </p>
 
+## CI pipeline
+
+[`.github/workflows/build.yml`](.github/workflows/build.yml) runs on every push to `main`,
+on every pull request, and on demand. It has two jobs.
+
+**`build and tests`** sets up JDK 21 (Temurin) with the Maven cache, then runs
+`./mvnw -B clean verify`. That one command covers:
+
+| Phase | Check | Fails the build when |
+|---|---|---|
+| `validate` | Checkstyle on `src/main` (`config/checkstyle/checkstyle.xml`) | any violation |
+| `test` | Unit tests (Surefire) | a test fails |
+| `integration-test` | Integration tests (Failsafe) with Testcontainers. The runner has Docker, so Postgres really starts | an integration test fails |
+| `verify` | Spotless: Palantir Java Format and unused imports | a file is not formatted |
+| `verify` | Checkstyle on `src/test` (`config/checkstyle/checkstyle-test.xml`) | any violation |
+| `verify` | JaCoCo coverage report | never: report only, no gate yet |
+
+A last step, `integration tests actually ran`, reads `failsafe-summary.xml` when any
+`*IT.java` exists. It fails when an integration test was skipped or none ran. Without it,
+a Docker guard or `@Disabled` could turn the tests off and `verify` would still be green.
+
+**`architectural boundaries`** runs `java .claude/hooks/ArchHook.java doctor`. It prints the
+boundary rules, the extension schema, the hook jar, the hook registrations and the compose
+checks. It reports only: `doctor` exits 0 even when a line is marked ❌.
+
+Not in CI yet: ArchUnit and the 80%/70% coverage gate, which `test-architect` installs, and
+SonarQube, which runs only against the local container.
+
 ## Origin
 
 Generated from the Nerviz meta-repo, with:

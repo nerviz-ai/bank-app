@@ -20,6 +20,36 @@ O `./mvnw clean verify` passa com testes, Spotless, Checkstyle e JaCoCo.
   <img alt="mvn clean verify no bank-app: 3 testes, 0 violações de Checkstyle, BUILD SUCCESS" src="docs/assets/bank-app-verify.gif" width="100%">
 </p>
 
+## Pipeline de CI
+
+O [`.github/workflows/build.yml`](.github/workflows/build.yml) roda em todo push na `main`,
+em todo pull request e sob demanda. Tem dois jobs.
+
+**`build and tests`** configura o JDK 21 (Temurin) com cache do Maven e roda
+`./mvnw -B clean verify`. Esse único comando cobre:
+
+| Fase | Verificação | Quebra o build quando |
+|---|---|---|
+| `validate` | Checkstyle em `src/main` (`config/checkstyle/checkstyle.xml`) | há qualquer violação |
+| `test` | Testes unitários (Surefire) | um teste falha |
+| `integration-test` | Testes de integração (Failsafe) com Testcontainers. O runner tem Docker, então o Postgres sobe de verdade | um teste de integração falha |
+| `verify` | Spotless: Palantir Java Format e imports não usados | um arquivo não está formatado |
+| `verify` | Checkstyle em `src/test` (`config/checkstyle/checkstyle-test.xml`) | há qualquer violação |
+| `verify` | Relatório de cobertura do JaCoCo | nunca: só relatório, ainda sem gate |
+
+Um último step, `integration tests actually ran`, lê o `failsafe-summary.xml` quando existe
+algum `*IT.java`. Ele falha quando um teste de integração foi pulado ou nenhum rodou. Sem
+ele, um guard de Docker ou um `@Disabled` poderia desligar os testes e o `verify` continuaria
+verde.
+
+**`architectural boundaries`** roda `java .claude/hooks/ArchHook.java doctor`. Ele mostra as
+regras de fronteira, o schema das extensões, o jar do hook, os registros de hooks e as
+verificações do compose. Só reporta: o `doctor` sai com 0 mesmo quando uma linha está
+marcada com ❌.
+
+Ainda fora do CI: o ArchUnit e o gate de cobertura de 80%/70%, que o `test-architect`
+instala, e o SonarQube, que roda só contra o container local.
+
 ## Origem
 
 Gerado a partir do meta-repo Nerviz, com:
