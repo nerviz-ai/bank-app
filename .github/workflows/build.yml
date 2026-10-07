@@ -88,6 +88,6 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # Proves enforcement is switched on for this machine, not just declared.
+      # Fails when a committed check of the .claude/ setup is red — the lines doctor.gate.labels names in .claude/schemas/extensions.json. CLAUDE_PROJECT_DIR and Compose are runner state and never gate.
       - name: doctor
-        run: java .claude/hooks/ArchHook.java doctor
+        run: java .claude/hooks/ArchHook.java doctor gate
