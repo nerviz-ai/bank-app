@@ -1,0 +1,9 @@
+# Active on every @SpringBootTest via @ActiveProfiles("test") (.claude/rules/testing.md
+# § Slices and context). Every job's on/off property is off here: a @SpringBootTest boots
+# the whole context, and an ungated trigger would run the prune against the test database
+# on its own clock, under tests that assert something else (.claude/rules/scheduling.md
+# § Triggers). A test that exercises the job calls the use case directly.
+app:
+  jobs:
+    prune-idempotency-keys:
+      enabled: false

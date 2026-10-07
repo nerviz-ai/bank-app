@@ -1,5 +1,5 @@
 ---
-status: approved
+status: implemented
 ---
 
 # UC-002 — Prune expired idempotency keys
@@ -177,25 +177,25 @@ implemented: `<date> · UC-002 · IdempotencyKeyPort gains deleteExpired; idempo
 
 ## Implementation order (checklist)
 
-- [ ] 1. Domain exceptions — n/a, REUSE (two new `errorCode`s only)
-- [ ] 2. Value objects — n/a, none
-- [ ] 3. Aggregate — n/a, none
-- [ ] 4. Events — n/a, none
-- [ ] 5. Use case command — `PruneExpiredIdempotencyKeysCommand`
-- [ ] 6. Use case — `PruneExpiredIdempotencyKeysUseCase` (concrete, no `@Transactional`)
-- [ ] 7. Output ports — `IdempotencyKeyPort.deleteExpired`
-- [ ] 8. Migration — n/a, none
-- [ ] 9. Persistence entity — n/a, `IdempotencyKeyEntity` unchanged
-- [ ] 10. Spring Data interface — `deleteExpiredBatch` added, `findByExpiresAtBefore` removed
-- [ ] 11. Repository adapter — `IdempotencyKeyStore.deleteExpired`
-- [ ] 12. Persistence properties — `app.jobs.prune-idempotency-keys.batch-size`
-- [ ] 13. DTOs + manual mapper — n/a, no endpoint
-- [ ] 14. Controller + contract interface + `ApiExceptionHandler` — n/a, no endpoint
-- [ ] 15. Idempotency interceptor / REST properties — n/a; Block J: `SchedulingConfig`, `JobRunRecorder`, `PruneIdempotencyKeysJobProperties`, `PruneExpiredIdempotencyKeysJob`, job and scheduling properties in `application.yml`, `src/test/resources/application-test.yml`
-- [ ] 16. Test fixtures — none new; private row helper in `IdempotencyKeyStoreIT`
-- [ ] 17. Unit tests
-- [ ] 18. Integration + context tests
-- [ ] 19. `./mvnw verify` — green build, coverage gate
+- [x] 1. Domain exceptions — n/a, REUSE (two new `errorCode`s only)
+- [x] 2. Value objects — n/a, none
+- [x] 3. Aggregate — n/a, none
+- [x] 4. Events — n/a, none
+- [x] 5. Use case command — `PruneExpiredIdempotencyKeysCommand`
+- [x] 6. Use case — `PruneExpiredIdempotencyKeysUseCase` (concrete, no `@Transactional`)
+- [x] 7. Output ports — `IdempotencyKeyPort.deleteExpired`
+- [x] 8. Migration — n/a, none
+- [x] 9. Persistence entity — n/a, `IdempotencyKeyEntity` unchanged
+- [x] 10. Spring Data interface — `deleteExpiredBatch` added, `findByExpiresAtBefore` removed
+- [x] 11. Repository adapter — `IdempotencyKeyStore.deleteExpired`
+- [x] 12. Persistence properties — `app.jobs.prune-idempotency-keys.batch-size`
+- [x] 13. DTOs + manual mapper — n/a, no endpoint
+- [x] 14. Controller + contract interface + `ApiExceptionHandler` — n/a, no endpoint
+- [x] 15. Idempotency interceptor / REST properties — n/a; Block J: `SchedulingConfig`, `JobRunRecorder`, `PruneIdempotencyKeysJobProperties`, `PruneExpiredIdempotencyKeysJob`, job and scheduling properties in `application.yml`, `src/test/resources/application-test.yml`
+- [x] 16. Test fixtures — none new; private row helper in `IdempotencyKeyStoreIT`
+- [x] 17. Unit tests
+- [x] 18. Integration + context tests
+- [x] 19. `./mvnw verify` — green build, coverage gate
 
 ---
 

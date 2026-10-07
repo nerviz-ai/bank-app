@@ -60,6 +60,17 @@ spring:
         query:
           fail_on_pagination_over_collection_fetch: true
 
+  # feature: jobs — UC-002 35-jobs.md § 8. A platform-thread scheduler has one thread by
+  # default; sized to the job count (currently 1) so a second job never waits for this one.
+  task:
+    scheduling:
+      pool:
+        size: 1
+      thread-name-prefix: job-
+      shutdown:
+        await-termination: true
+        await-termination-period: PT30S
+
   # feature: flyway
   flyway:
     enabled: true
@@ -114,3 +125,14 @@ logging:
     root: INFO
     # TRACE would log the bound security number and birth date (UC-001 20-persistencia.md § 5).
     org.hibernate.orm.jdbc.bind: WARN
+
+# feature: jobs — UC-002 20-persistencia.md § 5 (batch-size) + 35-jobs.md § 8 (the rest).
+# One `app.jobs` map: a job the project designs gets `app.jobs.<job-name>.*`.
+app:
+  jobs:
+    prune-idempotency-keys:
+      enabled: true
+      interval: PT1H
+      initial-delay: PT5M
+      batch-size: 1000
+      max-batches: 100

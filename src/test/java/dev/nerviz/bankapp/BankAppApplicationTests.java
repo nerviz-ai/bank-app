@@ -18,6 +18,17 @@ class BankAppApplicationTests {
     @Test
     void contextLoads() {}
 
+    // app.jobs.prune-idempotency-keys.enabled: false in application-test.yml must actually
+    // keep the trigger's @ConditionalOnProperty from registering it — proven here, in the
+    // context that boots every trigger (.claude/rules/scheduling.md § Triggers). The job stays
+    // package-private, so the check goes by bean name rather than importing its type.
+    @Test
+    void pruneJobIsOffUnderTestProfile(@Autowired ApplicationContext context) {
+        assertThat(context.containsBean("pruneExpiredIdempotencyKeysJob"))
+                .as("app.jobs.prune-idempotency-keys.enabled=false must keep the trigger out of the context")
+                .isFalse();
+    }
+
     // features.observability is on, but nothing registers a Tracer bean on its own — the
     // bridge and the OTLP exporter alone don't; the Boot glue starter does. A missing
     // starter otherwise fails far from the cause, at the first class that injects Tracer.

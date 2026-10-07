@@ -6,6 +6,7 @@ import dev.nerviz.bankapp.application.port.IdempotencyRequest;
 import dev.nerviz.bankapp.application.port.StoredResponse;
 import dev.nerviz.bankapp.domain.exception.ConflictException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -54,6 +55,12 @@ class IdempotencyKeyStore implements IdempotencyKeyPort {
     public void release(UUID key) {
         requireNoTransaction("release");
         repository.deleteById(key);
+    }
+
+    @Override
+    public int deleteExpired(Instant cutoff, int limit) {
+        requireNoTransaction("deleteExpired");
+        return repository.deleteExpiredBatch(cutoff, limit);
     }
 
     private IdempotencyClaim resolveCollision(IdempotencyKeyEntity existing, IdempotencyRequest request) {
