@@ -45,9 +45,11 @@
 		     from memory. No token here, ever: the scanner reads SONAR_TOKEN from the
 		     environment on its own. -->
 		<sonar.plugin.version>5.8.0.7211</sonar.plugin.version>
-		<sonar.projectKey>dev.nerviz:bank-app</sonar.projectKey>
-		<!-- Local container, added to docker-compose.yml by docker-architect. -->
-		<sonar.host.url>http://localhost:9000</sonar.host.url>
+		<!-- SonarQube Cloud, free for public projects. Override for a local server:
+		     ./mvnw sonar:sonar -Dsonar.host.url=http://localhost:9000 -->
+		<sonar.projectKey>nerviz-ai_bank-app</sonar.projectKey>
+		<sonar.organization>nerviz-ai</sonar.organization>
+		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
 		<!-- No sonar.coverage.jacoco.xmlReportPaths: the scanner's default,
 		     target/site/jacoco/jacoco.xml, is exactly where the jacoco-maven-plugin
 		     `report` execution writes. -->
