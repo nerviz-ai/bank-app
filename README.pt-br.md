@@ -1,5 +1,12 @@
 # bank-app
 
+[![Build](https://github.com/nerviz-ai/bank-app/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/nerviz-ai/bank-app/actions/workflows/build.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=nerviz-ai_bank-app&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nerviz-ai_bank-app)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=nerviz-ai_bank-app&metric=coverage)](https://sonarcloud.io/component_measures?id=nerviz-ai_bank-app&metric=coverage)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=nerviz-ai_bank-app&metric=bugs)](https://sonarcloud.io/project/issues?id=nerviz-ai_bank-app&types=BUG)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=nerviz-ai_bank-app&metric=vulnerabilities)](https://sonarcloud.io/project/issues?id=nerviz-ai_bank-app&types=VULNERABILITY)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=nerviz-ai_bank-app&metric=code_smells)](https://sonarcloud.io/project/issues?id=nerviz-ai_bank-app&types=CODE_SMELL)
+
 Projeto Spring Boot gerado por [Nerviz](https://github.com/nerviz-ai/nerviz),
 já preparado para desenvolvimento assistido por IA com Claude Code.
 
@@ -42,13 +49,22 @@ algum `*IT.java`. Ele falha quando um teste de integração foi pulado ou nenhum
 ele, um guard de Docker ou um `@Disabled` poderia desligar os testes e o `verify` continuaria
 verde.
 
+O job termina com `sonar analysis`: `./mvnw -B sonar:sonar` envia as classes e o relatório do
+JaCoCo para o SonarQube Cloud, organização `nerviz-ai`. O step lê o secret `SONAR_TOKEN` do
+repositório e é pulado quando ele não existe, como num pull request vindo de fork. O checkout
+usa `fetch-depth: 0` para a análise separar código novo de código antigo. A Automatic
+Analysis está desligada no SonarQube Cloud: este step é a única análise.
+
+**Relatório público:** <https://sonarcloud.io/project/overview?id=nerviz-ai_bank-app> — quality gate, cobertura, issues e duplicação, atualizados a
+cada push na `main`.
+
 **`architectural boundaries`** roda `java .claude/hooks/ArchHook.java doctor`. Ele mostra as
 regras de fronteira, o schema das extensões, o jar do hook, os registros de hooks e as
 verificações do compose. Só reporta: o `doctor` sai com 0 mesmo quando uma linha está
 marcada com ❌.
 
 Ainda fora do CI: o ArchUnit e o gate de cobertura de 80%/70%, que o `test-architect`
-instala, e o SonarQube, que roda só contra o container local.
+instala.
 
 ## Origem
 
@@ -204,6 +220,8 @@ Next steps:
    `layout: single-module`: não há POM por camada, então fora do Claude Code (um
    `mvn verify` simples, ou qualquer edição feita sem ele) o projeto não tem
    nenhuma aplicação de limite.
-3. SonarQube — local: `docker compose up -d sonarqube`, faça login em
+3. SonarQube — roda no CI contra o SonarQube Cloud, relatório em <https://sonarcloud.io/project/overview?id=nerviz-ai_bank-app>. Para analisar
+   contra um servidor local: `docker compose up -d sonarqube`, faça login em
    http://localhost:9000 como admin/admin (troca de senha obrigatória), crie um token em
-   My Account → Security, `export SONAR_TOKEN=…`, depois `./mvnw -B verify sonar:sonar`
+   My Account → Security, `export SONAR_TOKEN=…`, depois
+   `./mvnw -B verify sonar:sonar -Dsonar.host.url=http://localhost:9000`
