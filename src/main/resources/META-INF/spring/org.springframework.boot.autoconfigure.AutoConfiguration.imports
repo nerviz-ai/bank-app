@@ -1,0 +1,3 @@
+dev.nerviz.bankapp.commons.logging.aspect.GlobalHttpMethodLogAspect
+dev.nerviz.bankapp.commons.logging.aspect.LogExecutionAspect
+dev.nerviz.bankapp.commons.logging.aspect.HttpMethodLogExecutionAspect

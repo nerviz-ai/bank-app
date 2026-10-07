@@ -32,16 +32,40 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME:bank_app}}
     username: ${DB_USERNAME:bank_app}
     password: ${DB_PASSWORD}
+    # UC-001 20-persistencia.md § 5 — one short insert per request; a pool bigger than
+    # Postgres's default max_connections share only moves the queue.
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 10
+      connection-timeout: 3000
+      validation-timeout: 2000
+      max-lifetime: 1800000
+      pool-name: bank-app-pool
   jpa:
     open-in-view: false
+    show-sql: false
     hibernate:
       # The schema belongs to Flyway. Hibernate never alters it.
       ddl-auto: validate
+    properties:
+      jakarta:
+        persistence:
+          query:
+            timeout: 5000
+      hibernate:
+        jdbc:
+          time_zone: UTC
+          batch_size: 50
+        order_inserts: true
+        query:
+          fail_on_pagination_over_collection_fetch: true
 
   # feature: flyway
   flyway:
     enabled: true
     locations: classpath:db/migration
+    validate-on-migrate: true
+    out-of-order: false
 
   # feature: pagination — Spring Data doesn't reject an oversized `size` on its own;
   # without this, api-rest.md's "above the max is 400" contract is unenforced.
@@ -88,3 +112,5 @@ springdoc:
 logging:
   level:
     root: INFO
+    # TRACE would log the bound security number and birth date (UC-001 20-persistencia.md § 5).
+    org.hibernate.orm.jdbc.bind: WARN

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: implemented
 ---
 
 # UC-001 — Create customer
@@ -168,25 +168,25 @@ none — UC-001 is the first case.
 
 ## Implementation order (checklist)
 
-[ ] 1. Domain exceptions — family of five + `SecurityNumberAlreadyRegisteredException` (`10-dominio.md` § 2)
-[ ] 2. Value objects — `CustomerId`, `SecurityNumber`
-[ ] 3. Aggregate — `Customer` with `register` / `rehydrate`
-[ ] 4. Events — n/a, none
-[ ] 5. Use case command — `CreateCustomerCommand`
-[ ] 6. Use case — `CreateCustomerUseCase` (concrete, `@Transactional`), `ClockConfig`
-[ ] 7. Output ports — `CustomerRepository`; `IdempotencyKeyPort` and its types
-[ ] 8. Migrations — `V1`, `V2` from `20-persistencia.md` § 4
-[ ] 9. Persistence entities — `AssignedIdEntity`, `CustomerEntity`, `IdempotencyKeyEntity`
-[ ] 10. Spring Data interfaces
-[ ] 11. Repository adapters — `CustomerRepositoryJpaAdapter`, `IdempotencyKeyStore`
-[ ] 12. Persistence properties
-[ ] 13. DTOs + manual mapper
-[ ] 14. Controller + contract interface + `CreateCustomerOpenApiDocs` + `ApiExceptionHandler`
-[ ] 15. Idempotency interceptor + aspect + `IdempotentExecution` (first time: store + component) + `spring-boot-starter-aspectj`
-[ ] 16. Test fixtures — `CustomerFixtures`
-[ ] 17. Unit tests
-[ ] 18. Integration + contract tests; `@ActiveProfiles("test")` on `BankAppApplicationTests`
-[ ] 19. `./mvnw verify` — green build, coverage gate
+[x] 1. Domain exceptions — family of five + `SecurityNumberAlreadyRegisteredException` (`10-dominio.md` § 2)
+[x] 2. Value objects — `CustomerId`, `SecurityNumber`
+[x] 3. Aggregate — `Customer` with `register` / `rehydrate`
+[x] 4. Events — n/a, none
+[x] 5. Use case command — `CreateCustomerCommand`
+[x] 6. Use case — `CreateCustomerUseCase` (concrete, `@Transactional`), `ClockConfig`
+[x] 7. Output ports — `CustomerRepository`; `IdempotencyKeyPort` and its types
+[x] 8. Migrations — `V1`, `V2` from `20-persistencia.md` § 4
+[x] 9. Persistence entities — `AssignedIdEntity`, `CustomerEntity`, `IdempotencyKeyEntity`
+[x] 10. Spring Data interfaces
+[x] 11. Repository adapters — `CustomerRepositoryJpaAdapter`, `IdempotencyKeyStore`
+[x] 12. Persistence properties
+[x] 13. DTOs + manual mapper
+[x] 14. Controller + contract interface + `CreateCustomerOpenApiDocs` + `ApiExceptionHandler`
+[x] 15. Idempotency interceptor + aspect + `IdempotentExecution` (first time: store + component) + `spring-boot-starter-aspectj`
+[x] 16. Test fixtures — `CustomerFixtures`
+[x] 17. Unit tests
+[x] 18. Integration + contract tests; `@ActiveProfiles("test")` on `BankAppApplicationTests`
+[x] 19. `./mvnw verify` — green build, coverage gate
 
 ---
 

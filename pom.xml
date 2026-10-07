@@ -30,6 +30,10 @@
 		<java.version>21</java.version>
 		<!-- Resolved at runtime (curl to Maven Central), never from memory. -->
 		<spotless.version>3.10.3</spotless.version>
+		<!-- test-architect's setup mode (archunit-installer). Resolved from
+		     repo1.maven.org/maven2/com/tngtech/archunit/archunit-junit5/maven-metadata.xml's
+		     <release>, never from memory. -->
+		<archunit.version>1.5.1</archunit.version>
 		<checkstyle.plugin.version>3.6.0</checkstyle.plugin.version>
 		<checkstyle.version>14.3.0</checkstyle.version>
 		<!-- The Spring Boot parent does NOT manage this one — verified empty against its
@@ -63,6 +67,20 @@
 		<sonar.issue.ignore.multicriteria.s112.ruleKey>java:S112</sonar.issue.ignore.multicriteria.s112.ruleKey>
 		<sonar.issue.ignore.multicriteria.s112.resourceKey>**/IdempotencyAspect.java</sonar.issue.ignore.multicriteria.s112.resourceKey>
 	</properties>
+	<dependencyManagement>
+		<dependencies>
+			<!-- Not managed by the Spring Boot parent. Declared without <version> below,
+			     only in this single module — the one that sees every class
+			     (contains_main: true). -->
+			<dependency>
+				<groupId>com.tngtech.archunit</groupId>
+				<artifactId>archunit-junit5</artifactId>
+				<version>${archunit.version}</version>
+				<scope>test</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -140,6 +158,22 @@
 			<optional>true</optional>
 		</dependency>
 
+		<!-- commons-logging-installer: @Around advice for the annotations/aspects under
+		     commons.logging. No <version>: the Spring Boot parent (4.1.1) pins it. The AOP
+		     starter's artifactId changed in Boot 4 — spring-boot-starter-aop pre-Boot-4,
+		     see .claude/skills/project-bootstrap/references/dependency-catalog.md. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-aspectj</artifactId>
+		</dependency>
+		<!-- commons-logging-installer: generates metadata for the @ConfigurationProperties
+		     records in commons.logging.properties. Same scope Lombok already uses above. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
+			<optional>true</optional>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator-test</artifactId>
@@ -178,6 +212,13 @@
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>testcontainers-postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- test-architect's setup mode (archunit-installer). No <version>: pinned in
+		     dependencyManagement above. -->
+		<dependency>
+			<groupId>com.tngtech.archunit</groupId>
+			<artifactId>archunit-junit5</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
@@ -348,6 +389,36 @@
 						<goals>
 							<goal>report</goal>
 						</goals>
+					</execution>
+					<!-- The gate: rules/testing.md § Coverage — 80% lines / 70% branches, measured
+					     on the project's aggregate. Wired by test-architect's setup mode
+					     (archunit-installer), same pass as ArchUnit. Numbers come from the rule,
+					     never lowered to make the build pass. -->
+					<execution>
+						<id>check</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<rule>
+									<element>BUNDLE</element>
+									<limits>
+										<limit>
+											<counter>LINE</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>0.80</minimum>
+										</limit>
+										<limit>
+											<counter>BRANCH</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>0.70</minimum>
+										</limit>
+									</limits>
+								</rule>
+							</rules>
+						</configuration>
 					</execution>
 				</executions>
 			</plugin>
