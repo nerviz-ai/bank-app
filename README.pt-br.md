@@ -12,20 +12,19 @@ já preparado para desenvolvimento assistido por IA com Claude Code.
 
 *[English version](README.md)*
 
-## Rodando
+## Qualidade de código
 
-Iniciado pela IDE contra o Postgres do compose: o Flyway valida o schema e o Tomcat sobe na
-porta 8080.
+Relatório completo no SonarQube Cloud: **<https://sonarcloud.io/project/overview?id=nerviz-ai_bank-app>**
 
-<p align="center">
-  <img alt="bank-app subindo na IDE: o Flyway valida o schema e o Tomcat sobe na porta 8080" src="docs/assets/bank-app-run.gif" width="100%">
-</p>
+[![SonarQube Cloud quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=nerviz-ai_bank-app)](https://sonarcloud.io/summary/new_code?id=nerviz-ai_bank-app)
 
-O `./mvnw clean verify` passa com testes, Spotless, Checkstyle e JaCoCo.
+| Confiabilidade | Segurança | Manutenibilidade | Cobertura | Duplicação | Dívida técnica | Linhas de código |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| [![Confiabilidade](https://sonarcloud.io/api/project_badges/measure?project=nerviz-ai_bank-app&metric=reliability_rating)](https://sonarcloud.io/project/issues?id=nerviz-ai_bank-app&impactSoftwareQualities=RELIABILITY) | [![Segurança](https://sonarcloud.io/api/project_badges/measure?project=nerviz-ai_bank-app&metric=security_rating)](https://sonarcloud.io/project/issues?id=nerviz-ai_bank-app&impactSoftwareQualities=SECURITY) | [![Manutenibilidade](https://sonarcloud.io/api/project_badges/measure?project=nerviz-ai_bank-app&metric=sqale_rating)](https://sonarcloud.io/project/issues?id=nerviz-ai_bank-app&impactSoftwareQualities=MAINTAINABILITY) | [![Cobertura](https://sonarcloud.io/api/project_badges/measure?project=nerviz-ai_bank-app&metric=coverage)](https://sonarcloud.io/component_measures?id=nerviz-ai_bank-app&metric=coverage) | [![Duplicação](https://sonarcloud.io/api/project_badges/measure?project=nerviz-ai_bank-app&metric=duplicated_lines_density)](https://sonarcloud.io/component_measures?id=nerviz-ai_bank-app&metric=duplicated_lines_density) | [![Dívida técnica](https://sonarcloud.io/api/project_badges/measure?project=nerviz-ai_bank-app&metric=sqale_index)](https://sonarcloud.io/component_measures?id=nerviz-ai_bank-app&metric=sqale_index) | [![Linhas de código](https://sonarcloud.io/api/project_badges/measure?project=nerviz-ai_bank-app&metric=ncloc)](https://sonarcloud.io/component_measures?id=nerviz-ai_bank-app&metric=ncloc) |
 
-<p align="center">
-  <img alt="mvn clean verify no bank-app: 3 testes, 0 violações de Checkstyle, BUILD SUCCESS" src="docs/assets/bank-app-verify.gif" width="100%">
-</p>
+O card e as métricas acima são gerados ao vivo pelo SonarQube Cloud e mudam a cada análise
+da `main`. O GitHub remove `<iframe>` de um README, então o dashboard em si não pode ser
+embutido: clique em qualquer imagem para abrir a página correspondente do relatório.
 
 ## Pipeline de CI
 
@@ -92,6 +91,22 @@ O comando foi executado a partir do repositório Nerviz, mas este
 projeto é autocontido — nada aqui depende do meta-repo existir na máquina de quem clona.
 Veja `CLAUDE.md` para a arquitetura completa; este arquivo só orienta uma primeira
 leitura.
+
+## Primeiro caso de uso
+
+O [`UC-001-spec.md`](docs/use-cases/UC-001-create-customer/UC-001-spec.md) foi desenhado com:
+
+```
+/new-feature create one rest endpoint do save entity customer (name, securitynumber (11 digitis), bornDate (only above 18 yeas old)
+```
+
+A execução que o criou: a entrevista, depois `use-case-design`, `domain-modeling`,
+`rest-api-architect`, `persistence-architect` e `test-architect` escrevendo seus partials,
+e a spec consolidada aprovada e enviada com push.
+
+<p align="center">
+  <img alt="/new-feature no bank-app: a entrevista, use-case-design, domain-modeling, rest-api-architect, persistence-architect e test-architect escrevendo seus partials, a spec aprovada e enviada com push" src="docs/assets/new-feature-demo.gif" width="100%">
+</p>
 
 ## Blueprint
 
