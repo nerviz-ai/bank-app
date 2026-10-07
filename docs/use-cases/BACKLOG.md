@@ -8,7 +8,6 @@ are fixed only when the case is designed.
 
 | Id | Depends on | Description for `/new-feature` | Split from |
 |---|---|---|---|
-| `BL-01` | `UC-001-create-customer` | Scheduled job that deletes expired rows from the shared `idempotency_keys` table (`expires_at < now()`), in bounded batches, safe to run on more than one replica. No other effect | `UC-001-create-customer` — deferred by `20-persistencia.md` |
 | `BL-02` | `UC-001-create-customer` | REST endpoint that deletes or anonymizes one customer by id in the `customers` table, removing `security_number` and `birth_date`. Unknown id is not found | `UC-001-create-customer` — deferred by `20-persistencia.md` |
 
 ## Retired
@@ -19,3 +18,4 @@ the citation has to stay resolvable exactly at the moment the case stops being b
 
 | Id | Became | Date |
 |---|---|---|
+| `BL-01` | `UC-002-prune-expired-idempotency-keys` | 2026-10-08 |
