@@ -1,14 +1,20 @@
 package dev.nerviz.bankapp.infrastructure.rest;
 
 import dev.nerviz.bankapp.application.usecase.customer.CreateCustomerUseCase;
+import dev.nerviz.bankapp.application.usecase.customer.GetCustomerUseCase;
 import dev.nerviz.bankapp.domain.model.CustomerId;
 import dev.nerviz.bankapp.infrastructure.rest.dto.CreateCustomerRequest;
+import dev.nerviz.bankapp.infrastructure.rest.dto.CustomerDetailsResponse;
 import dev.nerviz.bankapp.infrastructure.rest.dto.CustomerResponse;
 import dev.nerviz.bankapp.infrastructure.rest.idempotent.Idempotent;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.util.UUID;
+import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,9 +28,11 @@ public class CustomerController implements CustomerApi {
     public static final String BASE_PATH = "/api/v1/customers";
 
     private final CreateCustomerUseCase createCustomer;
+    private final GetCustomerUseCase getCustomer;
 
-    public CustomerController(CreateCustomerUseCase createCustomer) {
+    public CustomerController(CreateCustomerUseCase createCustomer, GetCustomerUseCase getCustomer) {
         this.createCustomer = createCustomer;
+        this.getCustomer = getCustomer;
     }
 
     /**
@@ -39,5 +47,17 @@ public class CustomerController implements CustomerApi {
         CustomerId id = createCustomer.create(CustomerMapper.toCommand(request));
         CustomerResponse body = CustomerMapper.toResponse(id);
         return ResponseEntity.created(URI.create(BASE_PATH + "/" + body.id())).body(body);
+    }
+
+    /**
+     * {@code no-store}: the body carries a national identifier and a birth date in clear,
+     * and must stay out of browser and intermediary caches.
+     */
+    @Override
+    @GetMapping("/{customerId}")
+    public ResponseEntity<CustomerDetailsResponse> get(@PathVariable UUID customerId) {
+        CustomerDetailsResponse body =
+                CustomerMapper.toDetailsResponse(getCustomer.get(CustomerMapper.toGetCommand(customerId)));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body);
     }
 }

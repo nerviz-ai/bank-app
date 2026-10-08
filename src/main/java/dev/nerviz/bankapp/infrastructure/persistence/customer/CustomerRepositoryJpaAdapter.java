@@ -4,6 +4,7 @@ import dev.nerviz.bankapp.application.port.CustomerRepository;
 import dev.nerviz.bankapp.domain.exception.ConflictException;
 import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredException;
 import dev.nerviz.bankapp.domain.model.Customer;
+import dev.nerviz.bankapp.domain.model.CustomerId;
 import dev.nerviz.bankapp.domain.model.SecurityNumber;
 import java.util.Optional;
 import org.hibernate.exception.ConstraintViolationException;
@@ -43,6 +44,11 @@ class CustomerRepositoryJpaAdapter implements CustomerRepository {
         } catch (DataIntegrityViolationException cause) {
             throw translate(cause);
         }
+    }
+
+    @Override
+    public Optional<Customer> findById(CustomerId id) {
+        return repository.findById(id.value()).map(CustomerPersistenceMapper::toDomain);
     }
 
     private static RuntimeException translate(DataIntegrityViolationException cause) {

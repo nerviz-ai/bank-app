@@ -12,6 +12,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
@@ -74,6 +75,24 @@ class CustomerRepositoryJpaAdapterIT {
                 .isInstanceOf(SecurityNumberAlreadyRegisteredException.class)
                 .extracting("errorCode")
                 .isEqualTo("SECURITY_NUMBER_ALREADY_REGISTERED");
+    }
+
+    @Test
+    void findsSavedCustomerById() {
+        Customer saved = adapter.save(newCustomer("22233344455", LocalDate.of(1988, 3, 9)));
+
+        Optional<Customer> found = adapter.findById(saved.id());
+
+        assertThat(found).hasValue(saved);
+    }
+
+    @Test
+    void returnsEmptyForUnknownId() {
+        CustomerId unknown = CustomerId.of(UUID.fromString("00000000-0000-7000-8000-000000000000"));
+
+        Optional<Customer> found = adapter.findById(unknown);
+
+        assertThat(found).isEmpty();
     }
 
     private static Customer newCustomer(String securityNumber, LocalDate birthDate) {

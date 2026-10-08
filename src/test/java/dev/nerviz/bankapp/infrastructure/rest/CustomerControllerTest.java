@@ -3,6 +3,7 @@ package dev.nerviz.bankapp.infrastructure.rest;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -10,9 +11,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import dev.nerviz.bankapp.CustomerFixtures;
 import dev.nerviz.bankapp.application.usecase.customer.CreateCustomerUseCase;
+import dev.nerviz.bankapp.application.usecase.customer.GetCustomerUseCase;
 import dev.nerviz.bankapp.domain.exception.BusinessRuleViolationException;
+import dev.nerviz.bankapp.domain.exception.NotFoundException;
 import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredException;
 import dev.nerviz.bankapp.domain.exception.ValidationException;
+import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
 import io.micrometer.tracing.Tracer;
 import java.util.UUID;
@@ -38,12 +42,16 @@ import org.springframework.test.web.servlet.MockMvc;
 class CustomerControllerTest {
 
     private static final String VALID_KEY = "0f2b6c1e-4d3a-4f5b-9c8d-7e6f5a4b3c2d";
+    private static final String UNKNOWN_ID = "00000000-0000-7000-8000-000000000000";
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockitoBean
     private CreateCustomerUseCase createCustomer;
+
+    @MockitoBean
+    private GetCustomerUseCase getCustomer;
 
     /** ApiExceptionHandler injects Tracer. Without this double the slice doesn't start. */
     @MockitoBean
@@ -259,5 +267,61 @@ class CustomerControllerTest {
                 Arguments.of(new SecurityNumberAlreadyRegisteredException("already registered")),
                 Arguments.of(new ValidationException("SECURITY_NUMBER_INVALID", "invalid")),
                 Arguments.of(new IllegalStateException("boom")));
+    }
+
+    @Test
+    void returnsCustomerFullRecordWithNoStore() throws Exception {
+        Customer customer = CustomerFixtures.customer();
+        given(getCustomer.get(any())).willReturn(customer);
+
+        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + customer.id().value()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.id").value(customer.id().value().toString()))
+                .andExpect(jsonPath("$.name").value(CustomerFixtures.NAME))
+                .andExpect(jsonPath("$.securityNumber").value(CustomerFixtures.SECURITY_NUMBER))
+                .andExpect(jsonPath("$.birthDate").value(CustomerFixtures.BIRTH_DATE.toString()))
+                .andExpect(jsonPath("$.registeredAt").exists());
+    }
+
+    @Test
+    void answersNotFoundForUnknownId() throws Exception {
+        given(getCustomer.get(any())).willThrow(new NotFoundException("CUSTOMER_NOT_FOUND", "customer not found"));
+
+        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("CUSTOMER_NOT_FOUND"));
+    }
+
+    @Test
+    void rejectsIdThatIsNotUuid() throws Exception {
+        mockMvc.perform(get(CustomerController.BASE_PATH + "/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.violations[0].field").value("customerId"))
+                .andExpect(jsonPath("$.errorCode").doesNotExist());
+    }
+
+    @Test
+    void hidesInternalFailureOnReadBehindTraceId() throws Exception {
+        given(getCustomer.get(any())).willThrow(new IllegalStateException("boom"));
+
+        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.traceId").exists())
+                .andExpect(jsonPath("$.detail").value("Internal error"));
+    }
+
+    @Test
+    void neverEchoesPersonalDataInNotFound() throws Exception {
+        given(getCustomer.get(any())).willThrow(new NotFoundException("CUSTOMER_NOT_FOUND", "customer not found"));
+
+        String body = mockMvc.perform(get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        org.assertj.core.api.Assertions.assertThat(body)
+                .doesNotContain(CustomerFixtures.SECURITY_NUMBER)
+                .doesNotContain(CustomerFixtures.BIRTH_DATE.toString());
     }
 }
