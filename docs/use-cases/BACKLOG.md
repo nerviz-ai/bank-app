@@ -9,6 +9,8 @@ are fixed only when the case is designed.
 | Id | Depends on | Description for `/new-feature` | Split from |
 |---|---|---|---|
 | `BL-02` | `UC-001-create-customer` | REST endpoint that deletes or anonymizes one customer by id in the `customers` table, removing `security_number` and `birth_date`. Unknown id is not found | `UC-001-create-customer` — deferred by `20-persistencia.md` |
+| `BL-03` | `UC-004-initiate-kyc-verification` | Kafka consumer of the KYC result topic published by the KYC application. The message carries the customer id and the verdict `APPROVED` or `REJECT`. Updates `customers.status` from `KYC_IN_PROGRESS` to `ACTIVE` (APPROVED) or `REJECTED_BY_KYC` (REJECT). Reprocessing the same message must be safe — the consumer may receive duplicates | `UC-004-initiate-kyc-verification` |
+| `BL-04` | `UC-004-initiate-kyc-verification` | REST endpoint or operator command that resets a dead-lettered row of the shared `outbox_events` table to pending (attempts 0, `dead_lettered` false), so the relay re-sends it. Unknown event id is not found; a row that is not dead-lettered is a conflict | `UC-004-initiate-kyc-verification` — deferred by `25-mensageria.md` § 9 |
 
 ## Retired
 
