@@ -53,6 +53,10 @@
 		<!-- No sonar.coverage.jacoco.xmlReportPaths: the scanner's default,
 		     target/site/jacoco/jacoco.xml, is exactly where the jacoco-maven-plugin
 		     `report` execution writes. -->
+		<!-- The coverage scope: the jacoco-maven-plugin <excludes> of this pom.xml, each `.class`
+		     turned into `.java`, comma-separated. Coverage only: never sonar.exclusions, the
+		     classes are still analyzed for issues. -->
+		<sonar.coverage.exclusions>**/*Application.java,**/config/**,**/*Config.java,**/*Configuration.java</sonar.coverage.exclusions>
 		<!-- Findings accepted by design in code the framework's own templates ship, one
 		     entry each, scoped by rule AND file — never a rule switched off project-wide.
 		     Each Java template carries a comment pointing back here; remove the entry
