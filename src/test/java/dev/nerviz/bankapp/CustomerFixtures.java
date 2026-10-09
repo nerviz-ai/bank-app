@@ -3,6 +3,7 @@ package dev.nerviz.bankapp;
 import dev.nerviz.bankapp.application.usecase.customer.CreateCustomerCommand;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
+import dev.nerviz.bankapp.domain.model.CustomerStatus;
 import dev.nerviz.bankapp.domain.model.SecurityNumber;
 import java.time.Clock;
 import java.time.Instant;
@@ -24,6 +25,17 @@ public final class CustomerFixtures {
     public static Customer customer() {
         return Customer.register(
                 CustomerId.of(UUID.randomUUID()), NAME, SecurityNumber.of(SECURITY_NUMBER), BIRTH_DATE, FIXED_CLOCK);
+    }
+
+    /**
+     * Read-side tests only (persistence, controller): the state is rebuilt through
+     * {@code rehydrate}, never reached through a use case, because no production path moves a
+     * customer out of {@code KYC_IN_PROGRESS} yet.
+     */
+    public static Customer withStatus(CustomerStatus status) {
+        Customer base = customer();
+        return Customer.rehydrate(
+                base.id(), base.name(), base.securityNumber(), base.birthDate(), base.registeredAt(), status);
     }
 
     public static CreateCustomerCommand command() {

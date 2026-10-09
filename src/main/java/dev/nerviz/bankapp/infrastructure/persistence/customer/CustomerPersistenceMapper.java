@@ -15,7 +15,8 @@ final class CustomerPersistenceMapper {
                 customer.name(),
                 customer.securityNumber().value(),
                 customer.birthDate(),
-                customer.registeredAt());
+                customer.registeredAt(),
+                customer.status());
     }
 
     static Customer toDomain(CustomerEntity entity) {
@@ -24,6 +25,7 @@ final class CustomerPersistenceMapper {
                 entity.getName(),
                 SecurityNumber.of(entity.getSecurityNumber()),
                 entity.getBirthDate(),
-                entity.getRegisteredAt());
+                entity.getRegisteredAt(),
+                entity.getStatus());
     }
 }

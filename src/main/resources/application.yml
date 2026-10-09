@@ -60,16 +60,36 @@ spring:
         query:
           fail_on_pagination_over_collection_fetch: true
 
-  # feature: jobs — UC-002 35-jobs.md § 8. A platform-thread scheduler has one thread by
-  # default; sized to the job count (currently 1) so a second job never waits for this one.
+  # feature: jobs — UC-002 35-jobs.md § 8, raised by UC-004 35-jobs.md § 8. A platform-thread
+  # scheduler has one thread by default; sized to the job count (relay, outbox prune,
+  # idempotency prune) so a 1 s relay never delays the prunes behind it.
   task:
     scheduling:
       pool:
-        size: 1
+        size: 2
       thread-name-prefix: job-
       shutdown:
         await-termination: true
         await-termination-period: PT30S
+
+  # feature: messaging — UC-004 25-mensageria.md § 5. Form B: the relay sends the JSON text the
+  # appender stored, so both serializers only move a String. The bootstrap default is host-first
+  # (./mvnw spring-boot:run); the compose `app` service overrides it with the internal listener.
+  # Local broker is PLAINTEXT with no credentials; any other profile takes them from the
+  # environment (.claude/rules/secrets.md).
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:${KAFKA_EXTERNAL_PORT:29092}}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        delivery.timeout.ms: 30000
+        # The client refuses to start unless delivery.timeout.ms >= linger.ms + request.timeout.ms;
+        # its default request.timeout.ms (30000) leaves no room under the 30000 chosen above.
+        request.timeout.ms: 10000
+        max.block.ms: 10000
 
   # feature: flyway
   flyway:
@@ -136,3 +156,28 @@ app:
       initial-delay: PT5M
       batch-size: 1000
       max-batches: 100
+
+  # feature: outbox — UC-004 20-persistencia.md § 1 and § 5. Values the columns encode:
+  # batch / lease / attempts / backoff pace the relay's claim; prune-after is the retention
+  # of published rows, whose payload carries personal data in clear (personal-data.md § At rest).
+  outbox:
+    enabled: true
+    poll-interval: PT1S
+    prune-enabled: true
+    prune-cron: "0 30 3 * * *"
+    batch-size: 10
+    max-attempts: 10
+    backoff-base: PT1S
+    backoff-max: PT5M
+    lease: PT8M
+    prune-after: P7D
+    prune-batch-size: 500
+
+  # feature: messaging — UC-004 25-mensageria.md § 1, § 5 and § 9. Retention is explicit because the
+  # payload carries a national id in clear (.claude/rules/personal-data.md § In transit).
+  kafka:
+    topics:
+      kyc-verification-requested:
+        partitions: 3
+        replicas: ${KAFKA_TOPIC_REPLICAS:1}
+        retention: P7D

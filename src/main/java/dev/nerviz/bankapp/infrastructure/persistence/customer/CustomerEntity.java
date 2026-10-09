@@ -1,8 +1,11 @@
 package dev.nerviz.bankapp.infrastructure.persistence.customer;
 
+import dev.nerviz.bankapp.domain.model.CustomerStatus;
 import dev.nerviz.bankapp.infrastructure.persistence.shared.AssignedIdEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
@@ -45,16 +48,27 @@ class CustomerEntity extends AssignedIdEntity<UUID> {
     @Column(name = "registered_at", nullable = false, updatable = false)
     Instant registeredAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    CustomerStatus status;
+
     @Version
     @Column(name = "version", nullable = false)
     long version;
 
-    CustomerEntity(UUID id, String name, String securityNumber, LocalDate birthDate, Instant registeredAt) {
+    CustomerEntity(
+            UUID id,
+            String name,
+            String securityNumber,
+            LocalDate birthDate,
+            Instant registeredAt,
+            CustomerStatus status) {
         this.id = id;
         this.name = name;
         this.securityNumber = securityNumber;
         this.birthDate = birthDate;
         this.registeredAt = registeredAt;
+        this.status = status;
     }
 
     @Override

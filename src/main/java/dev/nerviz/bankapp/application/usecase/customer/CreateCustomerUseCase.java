@@ -2,6 +2,8 @@ package dev.nerviz.bankapp.application.usecase.customer;
 
 import com.fasterxml.uuid.Generators;
 import dev.nerviz.bankapp.application.port.CustomerRepository;
+import dev.nerviz.bankapp.application.port.RequestKycVerification;
+import dev.nerviz.bankapp.domain.event.KycVerificationRequested;
 import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
@@ -19,10 +21,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class CreateCustomerUseCase {
 
     private final CustomerRepository customerRepository;
+    private final RequestKycVerification requestKycVerification;
     private final Clock clock;
 
-    public CreateCustomerUseCase(CustomerRepository customerRepository, Clock clock) {
+    public CreateCustomerUseCase(
+            CustomerRepository customerRepository, RequestKycVerification requestKycVerification, Clock clock) {
         this.customerRepository = customerRepository;
+        this.requestKycVerification = requestKycVerification;
         this.clock = clock;
     }
 
@@ -30,6 +35,7 @@ public class CreateCustomerUseCase {
      * @throws dev.nerviz.bankapp.domain.exception.ValidationException malformed input
      * @throws dev.nerviz.bankapp.domain.exception.BusinessRuleViolationException underage customer
      * @throws SecurityNumberAlreadyRegisteredException security number already registered
+     *     (raised before the KYC request is recorded; a failure to record it rolls the creation back)
      */
     @Transactional
     public CustomerId create(CreateCustomerCommand command) {
@@ -39,6 +45,8 @@ public class CreateCustomerUseCase {
         }
         CustomerId id = CustomerId.of(Generators.timeBasedEpochGenerator().generate());
         Customer customer = Customer.register(id, command.name(), securityNumber, command.birthDate(), clock);
-        return customerRepository.save(customer).id();
+        Customer saved = customerRepository.save(customer);
+        requestKycVerification.request(KycVerificationRequested.of(saved));
+        return saved.id();
     }
 }

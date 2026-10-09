@@ -32,6 +32,7 @@ final class CustomerMapper {
                 customer.name(),
                 customer.securityNumber().value(),
                 customer.birthDate(),
-                customer.registeredAt());
+                customer.registeredAt(),
+                customer.status().name());
     }
 }

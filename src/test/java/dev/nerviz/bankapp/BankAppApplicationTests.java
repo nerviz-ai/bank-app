@@ -29,6 +29,20 @@ class BankAppApplicationTests {
                 .isFalse();
     }
 
+    // app.outbox.enabled and app.outbox.prune-enabled are false in application-test.yml: neither
+    // trigger may be registered, or the relay would poll a broker no test starts and the prune
+    // would run on its own clock (.claude/rules/scheduling.md § Triggers). Both jobs are
+    // package-private, so the check goes by bean name.
+    @Test
+    void noOutboxTriggerRunsUnderTestProfile(@Autowired ApplicationContext context) {
+        assertThat(context.containsBean("outboxRelayJob"))
+                .as("app.outbox.enabled=false must keep the relay trigger out of the context")
+                .isFalse();
+        assertThat(context.containsBean("outboxPruneJob"))
+                .as("app.outbox.prune-enabled=false must keep the prune trigger out of the context")
+                .isFalse();
+    }
+
     // features.observability is on, but nothing registers a Tracer bean on its own — the
     // bridge and the OTLP exporter alone don't; the Boot glue starter does. A missing
     // starter otherwise fails far from the cause, at the first class that injects Tracer.

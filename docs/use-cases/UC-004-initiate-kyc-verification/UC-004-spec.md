@@ -1,5 +1,5 @@
 ---
-status: approved
+status: implemented
 ---
 
 # UC-004 — Initiate KYC verification
@@ -198,25 +198,25 @@ idempotency is **unknown** — accepted by the requester, not contracted.
 
 ## Implementation order (checklist)
 
-[ ] 1. Domain exceptions — REUSE; new `errorCode`s only
-[ ] 2. `CustomerStatus`
-[ ] 3. `Customer` — `status`, `register`, `rehydrate`, `toString`
-[ ] 4. `KycVerificationRequested`
-[ ] 5. Command — REUSE `CreateCustomerCommand`; `RelayOutboxEventsCommand`, `PruneOutboxEventsCommand`
-[ ] 6. Use cases — `CreateCustomerUseCase` (CHANGE), `RelayOutboxEventsUseCase`, `PruneOutboxEventsUseCase`
-[ ] 7. Output ports — `RequestKycVerification`, `OutboxRelayGateway`, `OutboxEventSender`, `OutboxRetentionGateway`, `OutboxEventRecord`, `RelayOutcome`
-[ ] 8. Migrations — `V3`, `V4` from `20-persistencia.md` § 4
-[ ] 9. Persistence entities — `CustomerEntity` (CHANGE), `OutboxEventEntity`
-[ ] 10. Spring Data — `OutboxEventJpaRepository`
-[ ] 11. Adapters — `CustomerPersistenceMapper` (CHANGE), `OutboxEventStore`
-[ ] 12. Persistence properties — `app.outbox.*` values of `20-persistencia.md` § 5
-[ ] 13. DTOs + mapper — `CustomerDetailsResponse`, `CustomerMapper` (CHANGE)
-[ ] 14. Controller / contract / OpenAPI — no change beyond the DTO schema
-[ ] 15. Idempotency — REUSE
-[ ] 16. Test fixtures — `CustomerFixtures` (CHANGE)
-[ ] 17. Unit tests
-[ ] 18. Integration + contract tests
-[ ] 19. `./mvnw verify` — green build, coverage gate
+[x] 1. Domain exceptions — REUSE; new `errorCode`s only
+[x] 2. `CustomerStatus`
+[x] 3. `Customer` — `status`, `register`, `rehydrate`, `toString`
+[x] 4. `KycVerificationRequested`
+[x] 5. Command — REUSE `CreateCustomerCommand`; `RelayOutboxEventsCommand`, `PruneOutboxEventsCommand`
+[x] 6. Use cases — `CreateCustomerUseCase` (CHANGE), `RelayOutboxEventsUseCase`, `PruneOutboxEventsUseCase`
+[x] 7. Output ports — `RequestKycVerification`, `OutboxRelayGateway`, `OutboxEventSender`, `OutboxRetentionGateway`, `OutboxEventRecord`, `RelayOutcome`
+[x] 8. Migrations — `V3`, `V4` from `20-persistencia.md` § 4
+[x] 9. Persistence entities — `CustomerEntity` (CHANGE), `OutboxEventEntity`
+[x] 10. Spring Data — `OutboxEventJpaRepository`
+[x] 11. Adapters — `CustomerPersistenceMapper` (CHANGE), `OutboxEventStore`
+[x] 12. Persistence properties — `app.outbox.*` values of `20-persistencia.md` § 5
+[x] 13. DTOs + mapper — `CustomerDetailsResponse`, `CustomerMapper` (CHANGE)
+[x] 14. Controller / contract / OpenAPI — no change beyond the DTO schema
+[x] 15. Idempotency — REUSE
+[x] 16. Test fixtures — `CustomerFixtures` (CHANGE)
+[x] 17. Unit tests
+[x] 18. Integration + contract tests
+[x] 19. `./mvnw verify` — green build, coverage gate
 
 Block M (messaging, after REST): `spring-boot-starter-kafka`; `…messaging.outbox` (`TopicResolver`,
 `OutboxAppender`, `KafkaOutboxEventSender`, `KafkaOutboxConfig` with `NewTopic` and `retention.ms`

@@ -7,3 +7,13 @@ app:
   jobs:
     prune-idempotency-keys:
       enabled: false
+  outbox:
+    enabled: false
+    prune-enabled: false
+
+# UC-004: the test profile starts no broker. Without this the admin client would try to create
+# the NewTopic at context start and wait for a broker that is not there.
+spring:
+  kafka:
+    admin:
+      auto-create: false

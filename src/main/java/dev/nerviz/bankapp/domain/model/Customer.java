@@ -13,7 +13,12 @@ import java.time.LocalDate;
  * satisfied when the row was written.
  */
 public record Customer(
-        CustomerId id, String name, SecurityNumber securityNumber, LocalDate birthDate, Instant registeredAt) {
+        CustomerId id,
+        String name,
+        SecurityNumber securityNumber,
+        LocalDate birthDate,
+        Instant registeredAt,
+        CustomerStatus status) {
 
     private static final int NAME_MIN_LENGTH = 2;
     private static final int NAME_MAX_LENGTH = 120;
@@ -34,9 +39,16 @@ public record Customer(
         if (registeredAt == null) {
             throw new ValidationException("REGISTERED_AT_REQUIRED", "registration instant is required");
         }
+        if (status == null) {
+            throw new ValidationException("CUSTOMER_STATUS_REQUIRED", "customer status is required");
+        }
     }
 
-    /** Creation. Runs the date rules against today and stamps {@code registeredAt}. */
+    /**
+     * Creation. Runs the date rules against today, stamps {@code registeredAt} and starts the
+     * customer in {@link CustomerStatus#KYC_IN_PROGRESS}: no parameter lets the caller choose
+     * another status.
+     */
     public static Customer register(
             CustomerId id, String name, SecurityNumber securityNumber, LocalDate birthDate, Clock clock) {
         if (birthDate == null) {
@@ -46,13 +58,18 @@ public record Customer(
         requireNotInFuture(birthDate, today);
         requireNotTooOld(birthDate, today);
         requireOfAge(birthDate, today);
-        return new Customer(id, name, securityNumber, birthDate, clock.instant());
+        return new Customer(id, name, securityNumber, birthDate, clock.instant(), CustomerStatus.KYC_IN_PROGRESS);
     }
 
     /** Reconstruction from already-persisted data — used by the persistence adapter. */
     public static Customer rehydrate(
-            CustomerId id, String name, SecurityNumber securityNumber, LocalDate birthDate, Instant registeredAt) {
-        return new Customer(id, name, securityNumber, birthDate, registeredAt);
+            CustomerId id,
+            String name,
+            SecurityNumber securityNumber,
+            LocalDate birthDate,
+            Instant registeredAt,
+            CustomerStatus status) {
+        return new Customer(id, name, securityNumber, birthDate, registeredAt, status);
     }
 
     private static void requireNotInFuture(LocalDate birthDate, LocalDate today) {
@@ -87,6 +104,6 @@ public record Customer(
     @Override
     public String toString() {
         return "Customer[id=" + id + ", name=" + name + ", securityNumber=" + securityNumber
-                + ", birthDate=***, registeredAt=" + registeredAt + "]";
+                + ", birthDate=***, registeredAt=" + registeredAt + ", status=" + status + "]";
     }
 }

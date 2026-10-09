@@ -58,6 +58,7 @@ class GetCustomerIT {
         mockMvc.perform(get(location))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(createdId))
-                .andExpect(jsonPath("$.securityNumber").value(CustomerFixtures.SECURITY_NUMBER));
+                .andExpect(jsonPath("$.securityNumber").value(CustomerFixtures.SECURITY_NUMBER))
+                .andExpect(jsonPath("$.status").value("KYC_IN_PROGRESS"));
     }
 }

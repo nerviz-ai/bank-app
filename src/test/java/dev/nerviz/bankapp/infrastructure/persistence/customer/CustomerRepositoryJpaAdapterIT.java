@@ -7,6 +7,7 @@ import dev.nerviz.bankapp.TestcontainersConfiguration;
 import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
+import dev.nerviz.bankapp.domain.model.CustomerStatus;
 import dev.nerviz.bankapp.domain.model.SecurityNumber;
 import java.time.Clock;
 import java.time.Instant;
@@ -16,9 +17,14 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.DockerClientFactory;
 
 /**
@@ -39,6 +45,12 @@ class CustomerRepositoryJpaAdapterIT {
 
     @Autowired
     private CustomerRepositoryJpaAdapter adapter;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private TestEntityManager entityManager;
 
     @Test
     void persistsAndRereadsTheSameAggregate() {
@@ -84,6 +96,35 @@ class CustomerRepositoryJpaAdapterIT {
         Optional<Customer> found = adapter.findById(saved.id());
 
         assertThat(found).hasValue(saved);
+    }
+
+    @ParameterizedTest
+    @EnumSource(CustomerStatus.class)
+    void savesAndReadsStatus(CustomerStatus status) {
+        Customer customer = Customer.rehydrate(
+                CustomerId.of(UUID.randomUUID()),
+                "Maria Silva",
+                SecurityNumber.of("33344455566"),
+                LocalDate.of(1990, 5, 17),
+                CLOCK.instant(),
+                status);
+
+        adapter.save(customer);
+        entityManager.clear();
+
+        assertThat(adapter.findById(customer.id()))
+                .hasValueSatisfying(found -> assertThat(found.status()).isEqualTo(status));
+    }
+
+    @Test
+    void rejectsUnknownStatusAtDatabase() {
+        UUID id = UUID.randomUUID();
+        String insert = "INSERT INTO customers (id, name, security_number, birth_date, registered_at, status, version)"
+                + " VALUES (?, 'Maria Silva', '44455566677', DATE '1990-05-17', now(), 'UNKNOWN', 0)";
+
+        assertThatThrownBy(() -> jdbcTemplate.update(insert, id))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("ck_customers_status");
     }
 
     @Test

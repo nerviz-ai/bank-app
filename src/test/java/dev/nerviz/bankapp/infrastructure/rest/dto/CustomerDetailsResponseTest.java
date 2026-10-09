@@ -15,7 +15,8 @@ class CustomerDetailsResponseTest {
                 CustomerFixtures.NAME,
                 CustomerFixtures.SECURITY_NUMBER,
                 CustomerFixtures.BIRTH_DATE,
-                CustomerFixtures.FIXED_CLOCK.instant());
+                CustomerFixtures.FIXED_CLOCK.instant(),
+                "KYC_IN_PROGRESS");
 
         String rendered = response.toString();
 
@@ -23,5 +24,18 @@ class CustomerDetailsResponseTest {
                 .doesNotContain(CustomerFixtures.SECURITY_NUMBER)
                 .doesNotContain(CustomerFixtures.BIRTH_DATE.toString())
                 .contains(CustomerFixtures.NAME);
+    }
+
+    @Test
+    void keepsStatusReadableInToString() {
+        CustomerDetailsResponse response = new CustomerDetailsResponse(
+                UUID.randomUUID(),
+                CustomerFixtures.NAME,
+                CustomerFixtures.SECURITY_NUMBER,
+                CustomerFixtures.BIRTH_DATE,
+                CustomerFixtures.FIXED_CLOCK.instant(),
+                "KYC_IN_PROGRESS");
+
+        assertThat(response.toString()).contains("KYC_IN_PROGRESS");
     }
 }

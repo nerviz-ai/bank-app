@@ -18,12 +18,14 @@ import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredExcept
 import dev.nerviz.bankapp.domain.exception.ValidationException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
+import dev.nerviz.bankapp.domain.model.CustomerStatus;
 import io.micrometer.tracing.Tracer;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -282,6 +284,29 @@ class CustomerControllerTest {
                 .andExpect(jsonPath("$.securityNumber").value(CustomerFixtures.SECURITY_NUMBER))
                 .andExpect(jsonPath("$.birthDate").value(CustomerFixtures.BIRTH_DATE.toString()))
                 .andExpect(jsonPath("$.registeredAt").exists());
+    }
+
+    @ParameterizedTest
+    @EnumSource(CustomerStatus.class)
+    void getReturnsStatus(CustomerStatus status) throws Exception {
+        Customer customer = CustomerFixtures.withStatus(status);
+        given(getCustomer.get(any())).willReturn(customer);
+
+        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + customer.id().value()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(status.name()));
+    }
+
+    @Test
+    void createResponseHasNoStatus() throws Exception {
+        given(createCustomer.create(any())).willReturn(CustomerId.of(UUID.randomUUID()));
+
+        mockMvc.perform(post(CustomerController.BASE_PATH)
+                        .header("Idempotency-Key", VALID_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CustomerFixtures.requestJson()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").doesNotExist());
     }
 
     @Test

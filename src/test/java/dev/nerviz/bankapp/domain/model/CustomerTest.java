@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -171,16 +172,45 @@ class CustomerTest {
     void rehydrateDoesNotReapplyDateRules() {
         LocalDate futureIfRulesReran = LocalDate.of(2015, 3, 10);
 
-        Customer customer = Customer.rehydrate(ID, "Maria Silva", SECURITY_NUMBER, futureIfRulesReran, CLOCK.instant());
+        Customer customer = Customer.rehydrate(
+                ID, "Maria Silva", SECURITY_NUMBER, futureIfRulesReran, CLOCK.instant(), CustomerStatus.ACTIVE);
 
         assertThat(customer.birthDate()).isEqualTo(futureIfRulesReran);
     }
 
     @Test
     void rejectsMissingRegisteredAtOnRehydrate() {
-        assertThatThrownBy(() -> Customer.rehydrate(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, null))
+        assertThatThrownBy(() -> Customer.rehydrate(
+                        ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, null, CustomerStatus.ACTIVE))
                 .isInstanceOf(ValidationException.class)
                 .extracting("errorCode")
                 .isEqualTo("REGISTERED_AT_REQUIRED");
+    }
+
+    @Test
+    void registerBornKycInProgress() {
+        Customer customer = Customer.register(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK);
+
+        assertThat(customer.status()).isEqualTo(CustomerStatus.KYC_IN_PROGRESS);
+    }
+
+    @ParameterizedTest
+    @EnumSource(CustomerStatus.class)
+    void rehydrateRestoresStatus(CustomerStatus persisted) {
+        Customer customer =
+                Customer.rehydrate(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK.instant(), persisted);
+
+        assertThat(customer.status()).isEqualTo(persisted);
+    }
+
+    @Test
+    void rejectsMissingStatus() {
+        Instant registeredAt = CLOCK.instant();
+
+        assertThatThrownBy(() ->
+                        Customer.rehydrate(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, registeredAt, null))
+                .isInstanceOf(ValidationException.class)
+                .extracting("errorCode")
+                .isEqualTo("CUSTOMER_STATUS_REQUIRED");
     }
 }

@@ -43,7 +43,14 @@ public record CustomerDetailsResponse(
                 description = "Registration instant, ISO-8601 UTC",
                 example = "2026-10-08T12:00:00Z",
                 requiredMode = Schema.RequiredMode.REQUIRED)
-        Instant registeredAt)
+        Instant registeredAt,
+
+        @Schema(
+                description = "KYC lifecycle status of the customer",
+                allowableValues = {"KYC_IN_PROGRESS", "ACTIVE", "REJECTED_BY_KYC"},
+                example = "KYC_IN_PROGRESS",
+                requiredMode = Schema.RequiredMode.REQUIRED)
+        String status)
         implements LogMask {
 
     @Override
