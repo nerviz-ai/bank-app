@@ -37,11 +37,11 @@ on every pull request, and on demand. It has two jobs.
 | Phase | Check | Fails the build when |
 |---|---|---|
 | `validate` | Checkstyle on `src/main` (`config/checkstyle/checkstyle.xml`) | any violation |
-| `test` | Unit tests (Surefire) | a test fails |
+| `test` | Unit tests (Surefire), including the ArchUnit boundary rules (`ArchitectureTest`) | a test fails or a boundary is crossed |
 | `integration-test` | Integration tests (Failsafe) with Testcontainers. The runner has Docker, so Postgres really starts | an integration test fails |
 | `verify` | Spotless: Palantir Java Format and unused imports | a file is not formatted |
 | `verify` | Checkstyle on `src/test` (`config/checkstyle/checkstyle-test.xml`) | any violation |
-| `verify` | JaCoCo coverage report | never: report only, no gate yet |
+| `verify` | JaCoCo coverage gate (`jacoco:check`) | line coverage below 80% or branch coverage below 70% |
 
 A last step, `integration tests actually ran`, reads `failsafe-summary.xml` when any
 `*IT.java` exists. It fails when an integration test was skipped or none ran. Without it,
@@ -56,11 +56,11 @@ is off on SonarQube Cloud: this step is the only analysis.
 **Public report:** <https://sonarcloud.io/project/overview?id=nerviz-ai_bank-app> — quality gate, coverage, issues and duplication, updated on every
 push to `main`.
 
-**`architectural boundaries`** runs `java .claude/hooks/ArchHook.java doctor`. It prints the
-boundary rules, the extension schema, the hook jar, the hook registrations and the compose
-checks. It reports only: `doctor` exits 0 even when a line is marked ❌.
-
-Not in CI yet: ArchUnit and the 80%/70% coverage gate, which `test-architect` installs.
+**`architectural boundaries`** runs `java .claude/hooks/ArchHook.java doctor gate`. It prints
+the boundary rules, the extension schema, the hook jar, the hook registrations and the compose
+checks, and fails when a committed check of the `.claude/` setup is red (the lines
+`doctor.gate.labels` names in `.claude/schemas/extensions.json`). Runner state, such as
+`CLAUDE_PROJECT_DIR` and Compose, never fails the job.
 
 ## Origin
 
@@ -129,9 +129,12 @@ Resolved live by the Spring Initializr at generation time — never pinned from 
 - `testcontainers` — PostgreSQL container for integration tests
 - `actuator` — health, info and metrics endpoints
 - `observability` — OpenTelemetry tracing bridge + OTLP exporter
-- `archunit` — recorded for `test-architect`, not yet installed (see Next steps)
+- `archunit` — boundary rules in `ArchitectureTest`, installed by `test-architect` with the 80%/70% coverage gate
+- `messaging-kafka` — Kafka producer behind a transactional outbox, added by
+  [UC-004](docs/use-cases/UC-004-initiate-kyc-verification/). The broker is not in
+  `docker-compose.yml` yet
 
-Not active: `messaging-kafka`, `messaging-sqs`.
+Not active: `messaging-sqs`.
 
 ## Architecture of `.claude/`
 
@@ -160,7 +163,8 @@ generated it:
 - `http-client-architect` — designs the outbound HTTP adapter of an already-modeled use case
 - `jobs-architect` — designs scheduled/background jobs for an already-scoped use case
 - `messaging-architect` — designs the Kafka producer/consumer adapter for a domain event
-- `new-feature` — orchestrates the full feature pipeline, one use case per run
+- `new-feature` — designs one use case up to an approved spec
+- `new-feature-implement` — implements an approved spec in a clean session
 - `persistence-architect` — designs tables, JPA mapping, migrations and datasource config
 - `report-issue` — files an issue on the Nerviz repository from this project
 - `rest-api-architect` — designs the inbound REST adapter (endpoints, DTOs, OpenAPI)
@@ -174,7 +178,7 @@ generated it:
 ### Agents available
 
 - `archunit-installer` — installs ArchUnit and the JaCoCo coverage gate, invoked by `test-architect`'s setup mode
-- `commons-logging-installer` — installs the logging/masking annotations and AOP aspects into `commons`, invoked by `/new-feature`
+- `commons-logging-installer` — installs the logging/masking annotations and AOP aspects into `commons`, invoked by `/new-feature-implement`'s pre-flight
 - `java-spring-boot-developer` — implements Java code from an approved `spec.md`
 
 ## Generation report
@@ -223,13 +227,10 @@ Next steps:
 
 ## Next steps
 
-1. `/use-case-design <first-use-case-name>`
-2. Install the architecture tests (ArchUnit) and wire up the coverage gate with the
-   `test-architect` skill as soon as business classes exist. Until then boundaries
-   are guaranteed only by the hook (inside Claude Code). This blueprint is
-   `layout: single-module`: there is no per-layer POM, so outside Claude Code (a plain
-   `mvn verify`, or any edit made without it) the project has no enforcement at all.
-3. SonarQube — runs in CI against SonarQube Cloud, report at <https://sonarcloud.io/project/overview?id=nerviz-ai_bank-app>. To analyze
+1. Next use case: `/new-feature <description>`, then `/clear` and
+   `/new-feature-implement UC-NNN-<slug>`. Deferred work waits in
+   [`docs/use-cases/BACKLOG.md`](docs/use-cases/BACKLOG.md).
+2. SonarQube — runs in CI against SonarQube Cloud, report at <https://sonarcloud.io/project/overview?id=nerviz-ai_bank-app>. To analyze
    against a local server instead: `docker compose up -d sonarqube`, log in at
    http://localhost:9000 as admin/admin (a password change is forced), create a token under
    My Account → Security, `export SONAR_TOKEN=…`, then
