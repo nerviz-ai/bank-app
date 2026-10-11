@@ -55,6 +55,23 @@ edge. No local Caddy edge: the local profile runs plain HTTP on 8080. Norms:
 | Pulling a newer version of this `.claude/` into the project | skill `arch-adopt` — manual only (`/arch-adopt`), refuses a dirty worktree |
 | Creating a git repo, committing, or pushing this project | skill `git-publish` — chained automatically after `java-spring-boot-developer` succeeds; behind two confirmations |
 
+## Under another agent
+
+This file is also read by GitHub Copilot, and `AGENTS.md` points every other agent here.
+**Outside Claude Code, only the build is guaranteed**: the CI job `architectural boundaries`
+fails on an import a module's `AGENTS.md` forbids, and Checkstyle, the JaCoCo gate and — once
+`test-architect` installed it — the ArchUnit test refuse a violation whoever wrote it. The rest
+of what `.claude/` enforces runs as Claude Code hooks and permissions — the same forbidden
+imports blocked at edit time, each skill's write territory, approved specs under `docs/use-cases/`
+frozen, the `deny` list on secrets and force pushes, the audit trail, the pattern catalog
+handed to agents. Under the Copilot CLI those hooks may run and are not verified; under the
+Copilot cloud agent and every other agent they do not run, so hold to them by reading.
+
+- A skill whose row below says **manual only** is manual only under Claude Code. Anywhere
+  else, run one only when the user names it — `arch-adopt` rewrites `.claude/`.
+- The Copilot cloud agent has no user to answer. A skill that asks (`AskUserQuestion`) or
+  waits for a confirmation (`git-publish`) cannot finish there.
+
 ## Rules
 
 The detailed rules live in `.claude/rules/` — index at `.claude/rules/00-index.md`.

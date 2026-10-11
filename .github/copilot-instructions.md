@@ -1,0 +1,1 @@
+Read [CLAUDE.md](../CLAUDE.md) at the repository root before changing anything: it holds this project's build commands, invariants and module structure, and says which of its checks hold outside Claude Code.
