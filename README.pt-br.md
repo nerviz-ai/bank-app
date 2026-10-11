@@ -37,11 +37,11 @@ em todo pull request e sob demanda. Tem dois jobs.
 | Fase | Verificação | Quebra o build quando |
 |---|---|---|
 | `validate` | Checkstyle em `src/main` (`config/checkstyle/checkstyle.xml`) | há qualquer violação |
-| `test` | Testes unitários (Surefire) | um teste falha |
+| `test` | Testes unitários (Surefire), incluindo as regras de fronteira do ArchUnit (`ArchitectureTest`) | um teste falha ou uma fronteira é cruzada |
 | `integration-test` | Testes de integração (Failsafe) com Testcontainers. O runner tem Docker, então o Postgres sobe de verdade | um teste de integração falha |
 | `verify` | Spotless: Palantir Java Format e imports não usados | um arquivo não está formatado |
 | `verify` | Checkstyle em `src/test` (`config/checkstyle/checkstyle-test.xml`) | há qualquer violação |
-| `verify` | Relatório de cobertura do JaCoCo | nunca: só relatório, ainda sem gate |
+| `verify` | Gate de cobertura do JaCoCo (`jacoco:check`) | cobertura de linhas abaixo de 80% ou de branches abaixo de 70% |
 
 Um último step, `integration tests actually ran`, lê o `failsafe-summary.xml` quando existe
 algum `*IT.java`. Ele falha quando um teste de integração foi pulado ou nenhum rodou. Sem
@@ -57,13 +57,11 @@ Analysis está desligada no SonarQube Cloud: este step é a única análise.
 **Relatório público:** <https://sonarcloud.io/project/overview?id=nerviz-ai_bank-app> — quality gate, cobertura, issues e duplicação, atualizados a
 cada push na `main`.
 
-**`architectural boundaries`** roda `java .claude/hooks/ArchHook.java doctor`. Ele mostra as
-regras de fronteira, o schema das extensões, o jar do hook, os registros de hooks e as
-verificações do compose. Só reporta: o `doctor` sai com 0 mesmo quando uma linha está
-marcada com ❌.
-
-Ainda fora do CI: o ArchUnit e o gate de cobertura de 80%/70%, que o `test-architect`
-instala.
+**`architectural boundaries`** roda `java .claude/hooks/ArchHook.java doctor gate`. Ele mostra
+as regras de fronteira, o schema das extensões, o jar do hook, os registros de hooks e as
+verificações do compose, e falha quando uma verificação versionada do `.claude/` está
+vermelha (as linhas que `doctor.gate.labels` lista em `.claude/schemas/extensions.json`).
+Estado do runner, como `CLAUDE_PROJECT_DIR` e Compose, nunca derruba o job.
 
 ## Origem
 
@@ -134,9 +132,12 @@ memória:
 - `testcontainers` — container PostgreSQL para testes de integração
 - `actuator` — endpoints de health, info e metrics
 - `observability` — ponte de tracing OpenTelemetry + exportador OTLP
-- `archunit` — registrado para o `test-architect`, ainda não instalado (ver Próximos passos)
+- `archunit` — regras de fronteira em `ArchitectureTest`, instaladas pelo `test-architect` junto com o gate de cobertura de 80%/70%
+- `messaging-kafka` — produtor Kafka atrás de um outbox transacional, adicionado pelo
+  [UC-004](docs/use-cases/UC-004-initiate-kyc-verification/). O broker ainda não está no
+  `docker-compose.yml`
 
-Não ativas: `messaging-kafka`, `messaging-sqs`.
+Não ativa: `messaging-sqs`.
 
 ## Arquitetura do `.claude/`
 
@@ -165,7 +166,8 @@ que o gerou:
 - `http-client-architect` — desenha o adaptador HTTP de saída de um caso de uso já modelado
 - `jobs-architect` — desenha jobs agendados/em background para um caso de uso já delimitado
 - `messaging-architect` — desenha o adaptador produtor/consumidor Kafka para um evento de domínio
-- `new-feature` — orquestra o pipeline completo de feature, um caso de uso por execução
+- `new-feature` — desenha um caso de uso até a spec aprovada
+- `new-feature-implement` — implementa uma spec aprovada numa sessão limpa
 - `persistence-architect` — desenha tabelas, mapeamento JPA, migrações e configuração do datasource
 - `report-issue` — registra uma issue no repositório Nerviz a partir deste projeto
 - `rest-api-architect` — desenha o adaptador REST de entrada (endpoints, DTOs, OpenAPI)
@@ -179,7 +181,7 @@ que o gerou:
 ### Agents disponíveis
 
 - `archunit-installer` — instala o ArchUnit e o gate de cobertura JaCoCo, invocado pelo modo setup do `test-architect`
-- `commons-logging-installer` — instala as anotações de logging/masking e os aspectos AOP em `commons`, invocado pelo `/new-feature`
+- `commons-logging-installer` — instala as anotações de logging/masking e os aspectos AOP em `commons`, invocado pelo pre-flight do `/new-feature-implement`
 - `java-spring-boot-developer` — implementa código Java a partir de um `spec.md` aprovado
 
 ## Relatório da geração
@@ -228,14 +230,10 @@ Next steps:
 
 ## Próximos passos
 
-1. `/use-case-design <nome-do-primeiro-caso-de-uso>`
-2. Instalar os testes de arquitetura (ArchUnit) e ligar o gate de cobertura com a skill
-   `test-architect` assim que existirem classes de negócio. Até lá os limites são
-   garantidos apenas pelo hook (dentro do Claude Code). Este blueprint é
-   `layout: single-module`: não há POM por camada, então fora do Claude Code (um
-   `mvn verify` simples, ou qualquer edição feita sem ele) o projeto não tem
-   nenhuma aplicação de limite.
-3. SonarQube — roda no CI contra o SonarQube Cloud, relatório em <https://sonarcloud.io/project/overview?id=nerviz-ai_bank-app>. Para analisar
+1. Próximo caso de uso: `/new-feature <descrição>`, depois `/clear` e
+   `/new-feature-implement UC-NNN-<slug>`. O que ficou adiado espera em
+   [`docs/use-cases/BACKLOG.md`](docs/use-cases/BACKLOG.md).
+2. SonarQube — roda no CI contra o SonarQube Cloud, relatório em <https://sonarcloud.io/project/overview?id=nerviz-ai_bank-app>. Para analisar
    contra um servidor local: `docker compose up -d sonarqube`, faça login em
    http://localhost:9000 como admin/admin (troca de senha obrigatória), crie um token em
    My Account → Security, `export SONAR_TOKEN=…`, depois
