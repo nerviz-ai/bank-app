@@ -7,5 +7,5 @@ hold for you and which do not.
 
 - **Norms** live in `.claude/rules/`, one topic per file; `.claude/rules/00-index.md` says
   which file covers what. Open the one your change touches.
-- **Each module with import restrictions** has its own `AGENTS.md`, listing what that module
-  may not import.
+- **Import restrictions are per package**, not per module: `.claude/forbidden-imports.txt`
+  lists each forbidden prefix with the package path it applies to.

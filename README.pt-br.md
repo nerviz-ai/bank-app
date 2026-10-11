@@ -220,9 +220,9 @@ Next steps:
   1. /use-case-design <first-use-case-name>
   2. Install the architecture tests (ArchUnit) and wire up the coverage gate with the
      `test-architect` skill as soon as business classes exist. Until then boundaries
-     are guaranteed only by the hook (inside Claude Code). This blueprint is
-     `layout: single-module`: there is no per-layer POM, so outside Claude Code (a plain
-     `mvn verify`, or any edit made without it) the project has no enforcement at all.
+     are guaranteed by the `check` hook at edit time (inside Claude Code) and by CI's
+     `doctor gate`, which sweeps every source file against `.claude/forbidden-imports.txt`
+     (whoever wrote it).
   3. SonarQube — local: `docker compose up -d sonarqube`, log in at http://localhost:9000
      as admin/admin (a password change is forced), create a token under My Account →
      Security, `export SONAR_TOKEN=…`, then `./mvnw -B verify sonar:sonar`

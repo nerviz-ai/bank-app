@@ -59,7 +59,7 @@ edge. No local Caddy edge: the local profile runs plain HTTP on 8080. Norms:
 
 This file is also read by GitHub Copilot, and `AGENTS.md` points every other agent here.
 **Outside Claude Code, only the build is guaranteed**: the CI job `architectural boundaries`
-fails on an import a module's `AGENTS.md` forbids, and Checkstyle, the JaCoCo gate and — once
+fails on an import `.claude/forbidden-imports.txt` forbids, and Checkstyle, the JaCoCo gate and — once
 `test-architect` installed it — the ArchUnit test refuse a violation whoever wrote it. The rest
 of what `.claude/` enforces runs as Claude Code hooks and permissions — the same forbidden
 imports blocked at edit time, each skill's write territory, approved specs under `docs/use-cases/`
@@ -105,9 +105,10 @@ of truth for its topic and is cited, never copied.
 - `.` — depends on: nothing
 
 This blueprint is `layout: single-module`: there is no per-layer POM and the compiler
-enforces no boundary at all. Outside Claude Code the project has no enforcement
-whatsoever until ArchUnit is installed (`test-architect`) — boundaries are guaranteed
-only by `.claude/forbidden-imports.txt` and the hook that reads it, inside Claude Code.
+enforces no boundary at all. Boundaries are guaranteed by the `check` hook at edit time
+(inside Claude Code), by CI's `doctor gate`, which sweeps every source file against
+`.claude/forbidden-imports.txt` whoever wrote it, and by the ArchUnit test `test-architect`
+installed.
 
 **One exception to where Spring wiring goes: adapter-local wiring stays with its adapter.**
 A `@Configuration` that builds a `ProducerFactory`, a `KafkaTemplate`, a `DefaultErrorHandler`,
