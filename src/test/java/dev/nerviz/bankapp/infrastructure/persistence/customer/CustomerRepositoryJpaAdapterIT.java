@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.nerviz.bankapp.TestcontainersConfiguration;
+import dev.nerviz.bankapp.domain.exception.ConflictException;
 import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
 import dev.nerviz.bankapp.domain.model.CustomerStatus;
+import dev.nerviz.bankapp.domain.model.KycVerdict;
 import dev.nerviz.bankapp.domain.model.SecurityNumber;
 import java.time.Clock;
 import java.time.Instant;
@@ -134,6 +136,69 @@ class CustomerRepositoryJpaAdapterIT {
         Optional<Customer> found = adapter.findById(unknown);
 
         assertThat(found).isEmpty();
+    }
+
+    /** {@code save} branches on an existing id — proves the update half, 20-persistencia.md § 3. */
+    @Test
+    void updatesStatusOfExistingCustomer() {
+        Customer customer = newCustomer("55566677788", LocalDate.of(1990, 5, 17));
+        adapter.save(customer);
+
+        adapter.save(customer.recordKycVerdict(KycVerdict.APPROVED));
+
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(adapter.findById(customer.id()))
+                .hasValueSatisfying(found -> assertThat(found.status()).isEqualTo(CustomerStatus.ACTIVE));
+    }
+
+    /**
+     * Two successive updates in the same session must both succeed. Before 20-persistencia.md
+     * § 3, {@code save} built a fresh detached entity on every call with the primitive
+     * {@code version} defaulted to {@code 0}, so the second update always false-conflicted
+     * against the row's real version.
+     */
+    @Test
+    void updatesTwiceWithoutFalseConflict() {
+        Customer customer = newCustomer("66677788899", LocalDate.of(1990, 5, 17));
+        adapter.save(customer);
+
+        adapter.save(withStatus(customer, CustomerStatus.ACTIVE));
+        adapter.save(withStatus(customer, CustomerStatus.REJECTED_BY_KYC));
+
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(adapter.findById(customer.id()))
+                .hasValueSatisfying(found -> assertThat(found.status()).isEqualTo(CustomerStatus.REJECTED_BY_KYC));
+    }
+
+    /**
+     * The managed entity is cached in the persistence context with the version it had when
+     * loaded; a writer that changes the row underneath it (here, a direct SQL bump) is not
+     * seen until the flush, which is exactly when Hibernate raises the optimistic-lock failure.
+     */
+    @Test
+    void staleVersionIsConcurrentUpdateConflict() {
+        Customer customer = newCustomer("77788899900", LocalDate.of(1990, 5, 17));
+        adapter.save(customer);
+        jdbcTemplate.update(
+                "UPDATE customers SET version = version + 1 WHERE id = ?",
+                customer.id().value());
+
+        assertThatThrownBy(() -> adapter.save(withStatus(customer, CustomerStatus.ACTIVE)))
+                .isInstanceOf(ConflictException.class)
+                .extracting("errorCode")
+                .isEqualTo("CUSTOMER_CONCURRENT_UPDATE");
+    }
+
+    private static Customer withStatus(Customer customer, CustomerStatus status) {
+        return Customer.rehydrate(
+                customer.id(),
+                customer.name(),
+                customer.securityNumber(),
+                customer.birthDate(),
+                customer.registeredAt(),
+                status);
     }
 
     private static Customer newCustomer(String securityNumber, LocalDate birthDate) {

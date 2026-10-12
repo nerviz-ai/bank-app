@@ -90,6 +90,19 @@ spring:
         # its default request.timeout.ms (30000) leaves no room under the 30000 chosen above.
         request.timeout.ms: 10000
         max.block.ms: 10000
+    # feature: messaging — UC-005 25-mensageria.md § 5, the project's first consumer. Offsets
+    # commit only through the manual ack, after RecordKycVerdictUseCase returns; a lost verdict
+    # under earliest is reprocessed as a no-op, never silently dropped.
+    consumer:
+      group-id: bank-app.kyc-verdict
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: manual
+      # Overridden to false in application-test.yml: the test profile starts no broker.
+      auto-startup: true
 
   # feature: flyway
   flyway:
@@ -181,3 +194,8 @@ app:
         partitions: 3
         replicas: ${KAFKA_TOPIC_REPLICAS:1}
         retention: P7D
+      # feature: messaging — UC-005 25-mensageria.md § 1 and § 5. No retention: no personal data
+      # in the payload (.claude/rules/personal-data.md § In transit).
+      kyc-verification-completed:
+        partitions: 3
+        replicas: ${KAFKA_TOPIC_REPLICAS:1}

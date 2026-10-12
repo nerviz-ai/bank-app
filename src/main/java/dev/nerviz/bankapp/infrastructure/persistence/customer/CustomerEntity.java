@@ -71,6 +71,11 @@ class CustomerEntity extends AssignedIdEntity<UUID> {
         this.status = status;
     }
 
+    /** The only mutation the update path needs: the other columns are {@code updatable = false}. */
+    void changeStatus(CustomerStatus status) {
+        this.status = status;
+    }
+
     @Override
     public UUID getId() {
         return id;

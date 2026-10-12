@@ -9,6 +9,7 @@ import dev.nerviz.bankapp.domain.model.SecurityNumber;
 import java.util.Optional;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,17 +33,26 @@ class CustomerRepositoryJpaAdapter implements CustomerRepository {
     }
 
     /**
-     * {@code saveAndFlush}, not {@code save}: the INSERT must reach the database inside
-     * this try for the constraint violation to surface here, not at the transaction's
-     * commit.
+     * Load-and-mutate: an existing id is loaded and its status changed, so the entity keeps the
+     * row's real version; an absent id is inserted. {@code saveAndFlush}, not {@code save}: the
+     * statement must reach the database inside this try for the constraint or lock failure to
+     * surface here, not at the transaction's commit.
      */
     @Override
     public Customer save(Customer customer) {
         try {
-            return CustomerPersistenceMapper.toDomain(
-                    repository.saveAndFlush(CustomerPersistenceMapper.toEntity(customer)));
+            CustomerEntity entity = repository
+                    .findById(customer.id().value())
+                    .map(existing -> {
+                        existing.changeStatus(customer.status());
+                        return existing;
+                    })
+                    .orElseGet(() -> CustomerPersistenceMapper.toEntity(customer));
+            return CustomerPersistenceMapper.toDomain(repository.saveAndFlush(entity));
         } catch (DataIntegrityViolationException cause) {
             throw translate(cause);
+        } catch (ObjectOptimisticLockingFailureException cause) {
+            throw new ConflictException("CUSTOMER_CONCURRENT_UPDATE", "customer was changed concurrently", cause);
         }
     }
 

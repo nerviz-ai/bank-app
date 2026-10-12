@@ -1,6 +1,7 @@
 package dev.nerviz.bankapp.domain.model;
 
 import dev.nerviz.bankapp.domain.exception.BusinessRuleViolationException;
+import dev.nerviz.bankapp.domain.exception.ConflictException;
 import dev.nerviz.bankapp.domain.exception.ValidationException;
 import java.time.Clock;
 import java.time.Instant;
@@ -70,6 +71,29 @@ public record Customer(
             Instant registeredAt,
             CustomerStatus status) {
         return new Customer(id, name, securityNumber, birthDate, registeredAt, status);
+    }
+
+    /**
+     * The only way out of {@link CustomerStatus#KYC_IN_PROGRESS}. Returns the next state, never
+     * mutates. The verdict already applied returns {@code this} (duplicate, no-op); the opposite
+     * one on a final status is a conflict — the first verdict stands.
+     *
+     * @throws ValidationException {@code KYC_VERDICT_REQUIRED} — {@code verdict} is {@code null}
+     * @throws ConflictException {@code KYC_VERDICT_CONFLICT} — the opposite verdict was recorded
+     */
+    public Customer recordKycVerdict(KycVerdict verdict) {
+        if (verdict == null) {
+            throw new ValidationException("KYC_VERDICT_REQUIRED", "kyc verdict is required");
+        }
+        CustomerStatus target = verdict.resultingStatus();
+        if (status == CustomerStatus.KYC_IN_PROGRESS) {
+            return new Customer(id, name, securityNumber, birthDate, registeredAt, target);
+        }
+        if (status == target) {
+            return this;
+        }
+        throw new ConflictException(
+                "KYC_VERDICT_CONFLICT", "customer already has a final kyc status that conflicts with the verdict");
     }
 
     private static void requireNotInFuture(LocalDate birthDate, LocalDate today) {

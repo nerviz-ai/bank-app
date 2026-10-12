@@ -1,5 +1,5 @@
 ---
-status: approved
+status: implemented
 ---
 
 # UC-005 — Record KYC verdict
@@ -183,25 +183,25 @@ give the KYC application; until it adopts them, no verdict arrives.
 
 ## Implementation order (checklist)
 
-- [ ] 1. Domain exceptions — `CustomerNotFoundException`; new `errorCode`s
-- [ ] 2. Value objects — `KycVerdict`
-- [ ] 3. Aggregate — `Customer.recordKycVerdict`; `CustomerStatus` Javadoc
-- [ ] 4. Events — n/a, none
-- [ ] 5. Command — `RecordKycVerdictCommand`
-- [ ] 6. Use case — `RecordKycVerdictUseCase`; `GetCustomerUseCase` (CHANGE)
-- [ ] 7. Output ports — n/a, `CustomerRepository` REUSE
-- [ ] 8. Migration — n/a, none
-- [ ] 9. Persistence entity — `CustomerEntity.changeStatus`
-- [ ] 10. Spring Data interface — n/a, REUSE
-- [ ] 11. Repository adapter — `CustomerRepositoryJpaAdapter.save` load-and-mutate, lock translation
-- [ ] 12. Persistence properties — n/a, none
-- [ ] 13. DTOs + manual mapper — n/a, no endpoint
-- [ ] 14. Controller + contract interface + `ApiExceptionHandler` — n/a, unchanged
-- [ ] 15. Idempotency interceptor — n/a
-- [ ] 16. Test fixtures — `CustomerFixtures` REUSE
-- [ ] 17. Unit tests
-- [ ] 18. Integration + contract tests
-- [ ] 19. `./mvnw verify` — green build, coverage gate
+- [x] 1. Domain exceptions — `CustomerNotFoundException`; new `errorCode`s
+- [x] 2. Value objects — `KycVerdict`
+- [x] 3. Aggregate — `Customer.recordKycVerdict`; `CustomerStatus` Javadoc
+- [x] 4. Events — n/a, none
+- [x] 5. Command — `RecordKycVerdictCommand`
+- [x] 6. Use case — `RecordKycVerdictUseCase`; `GetCustomerUseCase` (CHANGE)
+- [x] 7. Output ports — n/a, `CustomerRepository` REUSE
+- [x] 8. Migration — n/a, none
+- [x] 9. Persistence entity — `CustomerEntity.changeStatus`
+- [x] 10. Spring Data interface — n/a, REUSE
+- [x] 11. Repository adapter — `CustomerRepositoryJpaAdapter.save` load-and-mutate, lock translation
+- [x] 12. Persistence properties — n/a, none
+- [x] 13. DTOs + manual mapper — n/a, no endpoint
+- [x] 14. Controller + contract interface + `ApiExceptionHandler` — n/a, unchanged
+- [x] 15. Idempotency interceptor — n/a
+- [x] 16. Test fixtures — `CustomerFixtures` REUSE
+- [x] 17. Unit tests
+- [x] 18. Integration + contract tests
+- [x] 19. `./mvnw verify` — green build, coverage gate
 
 Block M (messaging, after REST): `KafkaListenerConfig`; `KycVerificationCompletedTopicProperties`,
 `KycVerificationCompletedTopicConfig`; `KycVerificationCompletedPayload`,

@@ -1,7 +1,7 @@
 package dev.nerviz.bankapp.application.usecase.customer;
 
 import dev.nerviz.bankapp.application.port.CustomerRepository;
-import dev.nerviz.bankapp.domain.exception.NotFoundException;
+import dev.nerviz.bankapp.domain.exception.CustomerNotFoundException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
 import org.springframework.stereotype.Service;
@@ -22,12 +22,10 @@ public class GetCustomerUseCase {
     }
 
     /**
-     * @throws NotFoundException {@code CUSTOMER_NOT_FOUND} — no customer has this id
+     * @throws CustomerNotFoundException {@code CUSTOMER_NOT_FOUND} — no customer has this id
      */
     @Transactional(readOnly = true)
     public Customer get(GetCustomerCommand command) {
-        return customerRepository
-                .findById(CustomerId.of(command.id()))
-                .orElseThrow(() -> new NotFoundException("CUSTOMER_NOT_FOUND", "customer not found"));
+        return customerRepository.findById(CustomerId.of(command.id())).orElseThrow(CustomerNotFoundException::new);
     }
 }

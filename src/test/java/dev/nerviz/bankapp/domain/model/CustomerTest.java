@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.nerviz.bankapp.domain.exception.BusinessRuleViolationException;
+import dev.nerviz.bankapp.domain.exception.ConflictException;
 import dev.nerviz.bankapp.domain.exception.ValidationException;
 import java.time.Clock;
 import java.time.Instant;
@@ -212,5 +213,73 @@ class CustomerTest {
                 .isInstanceOf(ValidationException.class)
                 .extracting("errorCode")
                 .isEqualTo("CUSTOMER_STATUS_REQUIRED");
+    }
+
+    @ParameterizedTest
+    @MethodSource("verdictsFromKycInProgress")
+    void recordsVerdictFromKycInProgress(KycVerdict verdict, CustomerStatus expectedStatus) {
+        Customer inProgress = Customer.rehydrate(
+                ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK.instant(), CustomerStatus.KYC_IN_PROGRESS);
+
+        Customer moved = inProgress.recordKycVerdict(verdict);
+
+        assertThat(moved.status()).isEqualTo(expectedStatus);
+        assertThat(moved.id()).isEqualTo(inProgress.id());
+        assertThat(moved.name()).isEqualTo(inProgress.name());
+        assertThat(moved.securityNumber()).isEqualTo(inProgress.securityNumber());
+        assertThat(moved.birthDate()).isEqualTo(inProgress.birthDate());
+        assertThat(moved.registeredAt()).isEqualTo(inProgress.registeredAt());
+    }
+
+    private static Stream<Arguments> verdictsFromKycInProgress() {
+        return Stream.of(
+                Arguments.of(KycVerdict.APPROVED, CustomerStatus.ACTIVE),
+                Arguments.of(KycVerdict.REJECT, CustomerStatus.REJECTED_BY_KYC));
+    }
+
+    @ParameterizedTest
+    @MethodSource("finalStatusesWithTheirVerdict")
+    void sameVerdictOnFinalStatusIsNoOp(CustomerStatus finalStatus, KycVerdict verdict) {
+        Customer onFinalStatus =
+                Customer.rehydrate(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK.instant(), finalStatus);
+
+        Customer result = onFinalStatus.recordKycVerdict(verdict);
+
+        assertThat(result).isSameAs(onFinalStatus);
+    }
+
+    private static Stream<Arguments> finalStatusesWithTheirVerdict() {
+        return Stream.of(
+                Arguments.of(CustomerStatus.ACTIVE, KycVerdict.APPROVED),
+                Arguments.of(CustomerStatus.REJECTED_BY_KYC, KycVerdict.REJECT));
+    }
+
+    @ParameterizedTest
+    @MethodSource("finalStatusesWithOppositeVerdict")
+    void oppositeVerdictOnFinalStatusConflicts(CustomerStatus finalStatus, KycVerdict verdict) {
+        Customer onFinalStatus =
+                Customer.rehydrate(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK.instant(), finalStatus);
+
+        assertThatThrownBy(() -> onFinalStatus.recordKycVerdict(verdict))
+                .isInstanceOf(ConflictException.class)
+                .extracting("errorCode")
+                .isEqualTo("KYC_VERDICT_CONFLICT");
+    }
+
+    private static Stream<Arguments> finalStatusesWithOppositeVerdict() {
+        return Stream.of(
+                Arguments.of(CustomerStatus.ACTIVE, KycVerdict.REJECT),
+                Arguments.of(CustomerStatus.REJECTED_BY_KYC, KycVerdict.APPROVED));
+    }
+
+    @Test
+    void rejectsMissingVerdict() {
+        Customer inProgress = Customer.rehydrate(
+                ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK.instant(), CustomerStatus.KYC_IN_PROGRESS);
+
+        assertThatThrownBy(() -> inProgress.recordKycVerdict(null))
+                .isInstanceOf(ValidationException.class)
+                .extracting("errorCode")
+                .isEqualTo("KYC_VERDICT_REQUIRED");
     }
 }

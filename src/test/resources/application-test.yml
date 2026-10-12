@@ -13,7 +13,12 @@ app:
 
 # UC-004: the test profile starts no broker. Without this the admin client would try to create
 # the NewTopic at context start and wait for a broker that is not there.
+# UC-005 25-mensageria.md § 5: the listener container doesn't start either, for the same reason —
+# a @SpringBootTest would otherwise poll a broker that isn't there. KycVerdictKafkaIT turns it
+# back on against a real, Testcontainers-managed broker.
 spring:
   kafka:
     admin:
       auto-create: false
+    listener:
+      auto-startup: false

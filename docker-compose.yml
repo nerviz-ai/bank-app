@@ -16,8 +16,12 @@ services:
       # feature: observability — both signals, pointing at the collector's compose hostname.
       OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
       OTLP_METRICS_ENDPOINT: http://otel-collector:4318/v1/metrics
+      # UC-004 / UC-005 — the broker's compose-network listener (PLAINTEXT), never EXTERNAL.
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
 
   # feature: persistence-jpa — the engine application.yml's datasource.url already
@@ -72,8 +76,38 @@ services:
       retries: 30
       start_period: 60s
 
+  # UC-004 / UC-005 (25-mensageria.md) — single-node KRaft broker. Tag matched to the one
+  # pinned in KafkaContainerConfiguration.java. Two listeners, one per network: PLAINTEXT
+  # (kafka:9092) for the compose network, EXTERNAL (localhost:${KAFKA_EXTERNAL_PORT:-29092})
+  # for the host run — application.yml's bootstrap-servers default reads the same variable.
+  kafka:
+    image: apache/kafka:4.1.0
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+      - "${KAFKA_EXTERNAL_PORT:-29092}:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,EXTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:${KAFKA_EXTERNAL_PORT:-29092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    # Proves the broker is up, nothing more: it runs inside the container. Absolute path on
+    # purpose — the apache/kafka image does not put /opt/kafka/bin on PATH.
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres-data:
+  kafka-data:
   sonarqube-data:
   sonarqube-extensions:
   sonarqube-logs:

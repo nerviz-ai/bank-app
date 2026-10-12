@@ -8,7 +8,7 @@ import static org.mockito.Mockito.mock;
 
 import dev.nerviz.bankapp.CustomerFixtures;
 import dev.nerviz.bankapp.application.port.CustomerRepository;
-import dev.nerviz.bankapp.domain.exception.NotFoundException;
+import dev.nerviz.bankapp.domain.exception.CustomerNotFoundException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,7 +35,7 @@ class GetCustomerUseCaseTest {
         GetCustomerCommand command = new GetCustomerCommand(UUID.randomUUID());
 
         assertThatThrownBy(() -> useCase.get(command))
-                .isInstanceOf(NotFoundException.class)
+                .isInstanceOf(CustomerNotFoundException.class)
                 .hasMessage("customer not found")
                 .extracting("errorCode")
                 .isEqualTo("CUSTOMER_NOT_FOUND");
