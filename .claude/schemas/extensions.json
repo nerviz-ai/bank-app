@@ -235,7 +235,7 @@
     "universal_fields": ["model"],
     "classes": {
       "design": {
-        "$comment": "Emits one partial of one use case folder and nothing else. Nine skills, one shape.",
+        "$comment": "Emits one partial of one use case folder and nothing else. Ten skills, one shape.",
         "design_phase": true,
         "allowed_models": ["opus"],
         "write_allow": ["docs/use-cases/UC-*/**", "docs/use-cases/BACKLOG.md"],
@@ -243,7 +243,7 @@
         "skills": [
           "use-case-design", "domain-modeling", "persistence-architect",
           "rest-api-architect", "security-architect", "http-client-architect", "messaging-architect",
-          "jobs-architect", "test-architect"
+          "jobs-architect", "cache-architect", "test-architect"
         ]
       },
       "orchestrator": {
