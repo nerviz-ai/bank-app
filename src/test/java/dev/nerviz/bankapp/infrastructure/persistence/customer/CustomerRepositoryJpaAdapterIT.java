@@ -184,8 +184,9 @@ class CustomerRepositoryJpaAdapterIT {
         jdbcTemplate.update(
                 "UPDATE customers SET version = version + 1 WHERE id = ?",
                 customer.id().value());
+        Customer staleUpdate = withStatus(customer, CustomerStatus.ACTIVE);
 
-        assertThatThrownBy(() -> adapter.save(withStatus(customer, CustomerStatus.ACTIVE)))
+        assertThatThrownBy(() -> adapter.save(staleUpdate))
                 .isInstanceOf(ConflictException.class)
                 .extracting("errorCode")
                 .isEqualTo("CUSTOMER_CONCURRENT_UPDATE");

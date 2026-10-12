@@ -34,7 +34,7 @@ class KafkaListenerConfigTest {
     private final DefaultErrorHandler errorHandler =
             new KafkaListenerConfig().kafkaListenerErrorHandler(kafkaTemplate, new SimpleMeterRegistry(), jsonMapper);
 
-    private final ConsumerRecord<String, String> record =
+    private final ConsumerRecord<String, String> receivedRecord =
             new ConsumerRecord<>("bank-app.customer.kyc-verification-completed", 0, 0L, "customer-id", "{}");
     private final Consumer<?, ?> consumer = mock(Consumer.class);
     private final MessageListenerContainer container = mock(MessageListenerContainer.class);
@@ -45,9 +45,9 @@ class KafkaListenerConfigTest {
                 .willReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
 
         boolean customerNotFoundRecovered =
-                errorHandler.handleOne(new CustomerNotFoundException(), record, consumer, container);
+                errorHandler.handleOne(new CustomerNotFoundException(), receivedRecord, consumer, container);
         boolean conflictRecovered = errorHandler.handleOne(
-                new ConflictException("KYC_VERDICT_CONFLICT", "conflict"), record, consumer, container);
+                new ConflictException("KYC_VERDICT_CONFLICT", "conflict"), receivedRecord, consumer, container);
 
         assertThat(customerNotFoundRecovered).isTrue();
         assertThat(conflictRecovered).isTrue();
@@ -66,7 +66,10 @@ class KafkaListenerConfigTest {
                 .willReturn(CompletableFuture.completedFuture(mock(SendResult.class)));
 
         boolean recovered = errorHandler.handleOne(
-                new ConflictException("CUSTOMER_CONCURRENT_UPDATE", "stale version"), record, consumer, container);
+                new ConflictException("CUSTOMER_CONCURRENT_UPDATE", "stale version"),
+                receivedRecord,
+                consumer,
+                container);
 
         assertThat(recovered).isTrue();
     }
