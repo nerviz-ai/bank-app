@@ -1,0 +1,1 @@
+2026-10-12 · UC-005 · Customer gains recordKycVerdict (KYC_IN_PROGRESS → ACTIVE / REJECTED_BY_KYC, BL-03 closed); first Kafka consumer properties in application.yml and application-test.yml; kafka compose service materialized
