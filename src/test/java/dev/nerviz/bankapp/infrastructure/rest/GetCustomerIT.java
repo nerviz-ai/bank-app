@@ -1,6 +1,7 @@
 package dev.nerviz.bankapp.infrastructure.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -55,7 +56,7 @@ class GetCustomerIT {
         assertThat(location).isNotNull();
         String createdId = location.substring(location.lastIndexOf('/') + 1);
 
-        mockMvc.perform(get(location))
+        mockMvc.perform(get(location).with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(createdId))
                 .andExpect(jsonPath("$.securityNumber").value(CustomerFixtures.SECURITY_NUMBER))

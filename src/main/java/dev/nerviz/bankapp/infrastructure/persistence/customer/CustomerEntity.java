@@ -39,14 +39,17 @@ class CustomerEntity extends AssignedIdEntity<UUID> {
     String name;
 
     @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(name = "security_number", nullable = false, length = 11, updatable = false)
+    @Column(name = "security_number", nullable = true, length = 11)
     String securityNumber;
 
-    @Column(name = "birth_date", nullable = false, updatable = false)
+    @Column(name = "birth_date", nullable = true)
     LocalDate birthDate;
 
     @Column(name = "registered_at", nullable = false, updatable = false)
     Instant registeredAt;
+
+    @Column(name = "anonymized_at")
+    Instant anonymizedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -62,18 +65,27 @@ class CustomerEntity extends AssignedIdEntity<UUID> {
             String securityNumber,
             LocalDate birthDate,
             Instant registeredAt,
+            Instant anonymizedAt,
             CustomerStatus status) {
         this.id = id;
         this.name = name;
         this.securityNumber = securityNumber;
         this.birthDate = birthDate;
         this.registeredAt = registeredAt;
+        this.anonymizedAt = anonymizedAt;
         this.status = status;
     }
 
-    /** The only mutation the update path needs: the other columns are {@code updatable = false}. */
     void changeStatus(CustomerStatus status) {
         this.status = status;
+    }
+
+    /** Erases the personal data in place and stamps when. The only mutation besides {@link #changeStatus}. */
+    void anonymize(String placeholderName, Instant at) {
+        this.name = placeholderName;
+        this.anonymizedAt = at;
+        this.securityNumber = null;
+        this.birthDate = null;
     }
 
     @Override

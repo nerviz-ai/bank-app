@@ -1,5 +1,6 @@
 package dev.nerviz.bankapp.infrastructure.rest.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import dev.nerviz.bankapp.commons.logging.annotations.MaskSensitiveData;
 import dev.nerviz.bankapp.commons.logging.enums.MaskedType;
 import dev.nerviz.bankapp.commons.logging.interfaces.LogMask;
@@ -22,20 +23,26 @@ public record CustomerDetailsResponse(
                 requiredMode = Schema.RequiredMode.REQUIRED)
         UUID id,
 
-        @Schema(description = "Full name", example = "Maria Silva", requiredMode = Schema.RequiredMode.REQUIRED)
+        @Schema(
+                description = "Full name; the literal ANONYMIZED once the customer is anonymized",
+                example = "Maria Silva",
+                requiredMode = Schema.RequiredMode.REQUIRED)
+        @MaskSensitiveData(maskedType = MaskedType.NAME)
         String name,
 
         @Schema(
-                description = "National identification number, 11 digits",
+                description = "National identification number, 11 digits; absent once the customer is anonymized",
                 example = "12345678901",
-                requiredMode = Schema.RequiredMode.REQUIRED)
+                requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
         @MaskSensitiveData(maskedType = MaskedType.DOCUMENT)
         String securityNumber,
 
         @Schema(
-                description = "Birth date, ISO-8601",
+                description = "Birth date, ISO-8601; absent once the customer is anonymized",
                 example = "1990-05-17",
-                requiredMode = Schema.RequiredMode.REQUIRED)
+                requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @JsonInclude(JsonInclude.Include.NON_NULL)
         @MaskSensitiveData(maskedType = MaskedType.DATE)
         LocalDate birthDate,
 

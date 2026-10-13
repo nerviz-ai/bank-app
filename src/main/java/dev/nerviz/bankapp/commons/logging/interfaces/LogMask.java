@@ -61,6 +61,7 @@ public interface LogMask extends Serializable {
 
     private static boolean shouldMask(Field field, Object value) {
         return field.isAnnotationPresent(MaskSensitiveData.class)
+                && value != null
                 && (value.getClass().isPrimitive() || MASKABLE_TYPES.contains(value.getClass()));
     }
 }

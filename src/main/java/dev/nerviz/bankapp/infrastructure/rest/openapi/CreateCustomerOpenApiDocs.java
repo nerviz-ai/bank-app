@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -18,6 +19,7 @@ import org.springframework.http.ProblemDetail;
 /** Goes on {@code CustomerApi#create} alone — {@code @PostMapping} lives on the controller. */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
+@SecurityRequirements
 @Operation(
         summary = "Creates a customer",
         operationId = "createCustomer",

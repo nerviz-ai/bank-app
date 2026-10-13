@@ -29,11 +29,15 @@ import org.springframework.http.ProblemDetail;
         })
 @ApiResponse(
         responseCode = "200",
-        description = "Customer found",
+        description = "Customer found. securityNumber and birthDate are absent once the customer is anonymized",
         content = @Content(schema = @Schema(implementation = CustomerDetailsResponse.class)))
 @ApiResponse(
         responseCode = "400",
         description = "customerId is not a UUID",
+        content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+@ApiResponse(
+        responseCode = "401",
+        description = "No token, or the token is malformed, expired, or from another issuer or audience",
         content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
 @ApiResponse(
         responseCode = "404",

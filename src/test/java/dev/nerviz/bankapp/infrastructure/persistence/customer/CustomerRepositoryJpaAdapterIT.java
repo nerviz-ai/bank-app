@@ -8,6 +8,7 @@ import dev.nerviz.bankapp.domain.exception.ConflictException;
 import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
+import dev.nerviz.bankapp.domain.model.CustomerIdentity;
 import dev.nerviz.bankapp.domain.model.CustomerStatus;
 import dev.nerviz.bankapp.domain.model.KycVerdict;
 import dev.nerviz.bankapp.domain.model.SecurityNumber;
@@ -60,10 +61,11 @@ class CustomerRepositoryJpaAdapterIT {
 
         Customer saved = adapter.save(customer);
 
-        assertThat(adapter.existsBySecurityNumber(saved.securityNumber())).isTrue();
+        assertThat(adapter.existsBySecurityNumber(identified(saved).securityNumber()))
+                .isTrue();
         assertThat(saved.name()).isEqualTo("Maria Silva");
-        assertThat(saved.securityNumber().value()).isEqualTo("12345678901");
-        assertThat(saved.birthDate()).isEqualTo(LocalDate.of(1990, 5, 17));
+        assertThat(identified(saved).securityNumber().value()).isEqualTo("12345678901");
+        assertThat(identified(saved).birthDate()).isEqualTo(LocalDate.of(1990, 5, 17));
         assertThat(saved.registeredAt()).isEqualTo(CLOCK.instant());
     }
 
@@ -106,8 +108,7 @@ class CustomerRepositoryJpaAdapterIT {
         Customer customer = Customer.rehydrate(
                 CustomerId.of(UUID.randomUUID()),
                 "Maria Silva",
-                SecurityNumber.of("33344455566"),
-                LocalDate.of(1990, 5, 17),
+                CustomerIdentity.identified(SecurityNumber.of("33344455566"), LocalDate.of(1990, 5, 17)),
                 CLOCK.instant(),
                 status);
 
@@ -192,18 +193,69 @@ class CustomerRepositoryJpaAdapterIT {
                 .isEqualTo("CUSTOMER_CONCURRENT_UPDATE");
     }
 
+    @Test
+    void persistsAnonymizationOnExistingRow() {
+        Customer active = withStatus(newCustomer("88899900011", LocalDate.of(1990, 5, 17)), CustomerStatus.ACTIVE);
+        adapter.save(active);
+        Customer anonymized = active.anonymize(CLOCK);
+
+        adapter.save(anonymized);
+
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(adapter.findById(active.id())).hasValue(anonymized);
+        assertThat(adapter.findById(active.id())).hasValueSatisfying(found -> {
+            assertThat(found.name()).isEqualTo(Customer.ANONYMIZED_NAME);
+            assertThat(found.identity()).isEqualTo(new CustomerIdentity.Anonymized(CLOCK.instant()));
+        });
+        assertThat(jdbcTemplate.queryForMap(
+                        "SELECT security_number, birth_date FROM customers WHERE id = ?",
+                        active.id().value()))
+                .containsEntry("security_number", null)
+                .containsEntry("birth_date", null);
+    }
+
+    @Test
+    void anonymizedSecurityNumberIsFreeForNewCustomer() {
+        Customer active = withStatus(newCustomer("99900011122", LocalDate.of(1990, 5, 17)), CustomerStatus.ACTIVE);
+        adapter.save(active);
+        adapter.save(active.anonymize(CLOCK));
+        entityManager.flush();
+
+        assertThat(adapter.existsBySecurityNumber(SecurityNumber.of("99900011122")))
+                .isFalse();
+        Customer reuse = newCustomer("99900011122", LocalDate.of(1985, 1, 2));
+        assertThat(adapter.save(reuse)).isEqualTo(reuse);
+    }
+
+    @Test
+    void statusChangeOnAnonymizedRowKeepsItAnonymized() {
+        Customer active = withStatus(newCustomer("00011122233", LocalDate.of(1990, 5, 17)), CustomerStatus.ACTIVE);
+        adapter.save(active);
+        Customer anonymized = active.anonymize(CLOCK);
+        adapter.save(anonymized);
+
+        adapter.save(withStatus(anonymized, CustomerStatus.REJECTED_BY_KYC));
+
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(adapter.findById(active.id())).hasValueSatisfying(found -> {
+            assertThat(found.status()).isEqualTo(CustomerStatus.REJECTED_BY_KYC);
+            assertThat(found.identity()).isEqualTo(new CustomerIdentity.Anonymized(CLOCK.instant()));
+            assertThat(found.name()).isEqualTo(Customer.ANONYMIZED_NAME);
+        });
+    }
+
     private static Customer withStatus(Customer customer, CustomerStatus status) {
-        return Customer.rehydrate(
-                customer.id(),
-                customer.name(),
-                customer.securityNumber(),
-                customer.birthDate(),
-                customer.registeredAt(),
-                status);
+        return Customer.rehydrate(customer.id(), customer.name(), customer.identity(), customer.registeredAt(), status);
     }
 
     private static Customer newCustomer(String securityNumber, LocalDate birthDate) {
         return Customer.register(
                 CustomerId.of(UUID.randomUUID()), "Maria Silva", SecurityNumber.of(securityNumber), birthDate, CLOCK);
+    }
+
+    private static CustomerIdentity.Identified identified(Customer customer) {
+        return (CustomerIdentity.Identified) customer.identity();
     }
 }

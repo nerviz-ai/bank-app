@@ -3,6 +3,7 @@ package dev.nerviz.bankapp.infrastructure.rest;
 import dev.nerviz.bankapp.infrastructure.rest.dto.CreateCustomerRequest;
 import dev.nerviz.bankapp.infrastructure.rest.dto.CustomerDetailsResponse;
 import dev.nerviz.bankapp.infrastructure.rest.dto.CustomerResponse;
+import dev.nerviz.bankapp.infrastructure.rest.openapi.AnonymizeCustomerOpenApiDocs;
 import dev.nerviz.bankapp.infrastructure.rest.openapi.CreateCustomerOpenApiDocs;
 import dev.nerviz.bankapp.infrastructure.rest.openapi.GetCustomerOpenApiDocs;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,4 +19,7 @@ public interface CustomerApi {
 
     @GetCustomerOpenApiDocs
     ResponseEntity<CustomerDetailsResponse> get(UUID customerId);
+
+    @AnonymizeCustomerOpenApiDocs
+    ResponseEntity<Void> anonymize(UUID customerId);
 }

@@ -39,6 +39,16 @@ class KycVerificationRequestedTest {
                         Instant.parse("2026-01-15T10:00:00Z")));
     }
 
+    @Test
+    void rejectsAnonymizedCustomer() {
+        Customer anonymized = CustomerFixtures.anonymized();
+
+        assertThatThrownBy(() -> KycVerificationRequested.of(anonymized))
+                .isInstanceOf(ValidationException.class)
+                .extracting("errorCode")
+                .isEqualTo("KYC_REQUEST_FIELD_REQUIRED");
+    }
+
     @ParameterizedTest
     @MethodSource("eventWithOneMissingField")
     void rejectsMissingField(

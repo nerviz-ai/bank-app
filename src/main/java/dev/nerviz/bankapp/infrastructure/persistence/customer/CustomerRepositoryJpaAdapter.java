@@ -5,6 +5,7 @@ import dev.nerviz.bankapp.domain.exception.ConflictException;
 import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
+import dev.nerviz.bankapp.domain.model.CustomerIdentity;
 import dev.nerviz.bankapp.domain.model.SecurityNumber;
 import java.util.Optional;
 import org.hibernate.exception.ConstraintViolationException;
@@ -33,7 +34,7 @@ class CustomerRepositoryJpaAdapter implements CustomerRepository {
     }
 
     /**
-     * Load-and-mutate: an existing id is loaded and its status changed, so the entity keeps the
+     * Load-and-mutate: an existing id is loaded and its status and anonymization applied, so the entity keeps the
      * row's real version; an absent id is inserted. {@code saveAndFlush}, not {@code save}: the
      * statement must reach the database inside this try for the constraint or lock failure to
      * surface here, not at the transaction's commit.
@@ -45,6 +46,10 @@ class CustomerRepositoryJpaAdapter implements CustomerRepository {
                     .findById(customer.id().value())
                     .map(existing -> {
                         existing.changeStatus(customer.status());
+                        if (customer.identity() instanceof CustomerIdentity.Anonymized anonymized
+                                && existing.getAnonymizedAt() == null) {
+                            existing.anonymize(customer.name(), anonymized.anonymizedAt());
+                        }
                         return existing;
                     })
                     .orElseGet(() -> CustomerPersistenceMapper.toEntity(customer));

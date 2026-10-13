@@ -14,12 +14,9 @@ import java.time.LocalDate;
  * satisfied when the row was written.
  */
 public record Customer(
-        CustomerId id,
-        String name,
-        SecurityNumber securityNumber,
-        LocalDate birthDate,
-        Instant registeredAt,
-        CustomerStatus status) {
+        CustomerId id, String name, CustomerIdentity identity, Instant registeredAt, CustomerStatus status) {
+
+    public static final String ANONYMIZED_NAME = "ANONYMIZED";
 
     private static final int NAME_MIN_LENGTH = 2;
     private static final int NAME_MAX_LENGTH = 120;
@@ -31,11 +28,12 @@ public record Customer(
             throw new ValidationException("CUSTOMER_ID_REQUIRED", "customer id is required");
         }
         name = requireValidName(name);
-        if (securityNumber == null) {
-            throw new ValidationException("SECURITY_NUMBER_REQUIRED", "security number is required");
+        if (identity == null) {
+            throw new ValidationException("CUSTOMER_IDENTITY_REQUIRED", "customer identity is required");
         }
-        if (birthDate == null) {
-            throw new ValidationException("BIRTH_DATE_REQUIRED", "birth date is required");
+        if (identity instanceof CustomerIdentity.Anonymized && !ANONYMIZED_NAME.equals(name)) {
+            throw new ValidationException(
+                    "CUSTOMER_ANONYMIZED_NAME_MISMATCH", "an anonymized customer must carry the placeholder name");
         }
         if (registeredAt == null) {
             throw new ValidationException("REGISTERED_AT_REQUIRED", "registration instant is required");
@@ -59,18 +57,18 @@ public record Customer(
         requireNotInFuture(birthDate, today);
         requireNotTooOld(birthDate, today);
         requireOfAge(birthDate, today);
-        return new Customer(id, name, securityNumber, birthDate, clock.instant(), CustomerStatus.KYC_IN_PROGRESS);
+        return new Customer(
+                id,
+                name,
+                CustomerIdentity.identified(securityNumber, birthDate),
+                clock.instant(),
+                CustomerStatus.KYC_IN_PROGRESS);
     }
 
     /** Reconstruction from already-persisted data — used by the persistence adapter. */
     public static Customer rehydrate(
-            CustomerId id,
-            String name,
-            SecurityNumber securityNumber,
-            LocalDate birthDate,
-            Instant registeredAt,
-            CustomerStatus status) {
-        return new Customer(id, name, securityNumber, birthDate, registeredAt, status);
+            CustomerId id, String name, CustomerIdentity identity, Instant registeredAt, CustomerStatus status) {
+        return new Customer(id, name, identity, registeredAt, status);
     }
 
     /**
@@ -87,13 +85,36 @@ public record Customer(
         }
         CustomerStatus target = verdict.resultingStatus();
         if (status == CustomerStatus.KYC_IN_PROGRESS) {
-            return new Customer(id, name, securityNumber, birthDate, registeredAt, target);
+            return new Customer(id, name, identity, registeredAt, target);
         }
         if (status == target) {
             return this;
         }
         throw new ConflictException(
                 "KYC_VERDICT_CONFLICT", "customer already has a final kyc status that conflicts with the verdict");
+    }
+
+    /**
+     * Erases the personal data and keeps the row. Returns the next state, never mutates. An
+     * already-anonymized customer returns {@code this} — checked before the status rule, so the
+     * first {@code anonymizedAt} stays. Status is not touched.
+     *
+     * @throws BusinessRuleViolationException {@code CUSTOMER_KYC_IN_PROGRESS} — the KYC status is
+     *     not final yet
+     */
+    public Customer anonymize(Clock clock) {
+        if (isAnonymized()) {
+            return this;
+        }
+        if (status == CustomerStatus.KYC_IN_PROGRESS) {
+            throw new BusinessRuleViolationException(
+                    "CUSTOMER_KYC_IN_PROGRESS", "customer cannot be anonymized while KYC is in progress");
+        }
+        return new Customer(id, ANONYMIZED_NAME, CustomerIdentity.anonymized(clock.instant()), registeredAt, status);
+    }
+
+    public boolean isAnonymized() {
+        return identity instanceof CustomerIdentity.Anonymized;
     }
 
     private static void requireNotInFuture(LocalDate birthDate, LocalDate today) {
@@ -127,7 +148,7 @@ public record Customer(
 
     @Override
     public String toString() {
-        return "Customer[id=" + id + ", name=" + name + ", securityNumber=" + securityNumber
-                + ", birthDate=***, registeredAt=" + registeredAt + ", status=" + status + "]";
+        return "Customer[id=" + id + ", name=***, identity=" + identity + ", registeredAt=" + registeredAt + ", status="
+                + status + "]";
     }
 }

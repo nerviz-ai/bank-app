@@ -104,6 +104,18 @@ spring:
       # Overridden to false in application-test.yml: the test profile starts no broker.
       auto-startup: true
 
+  # feature: security — UC-006 32-seguranca.md § 9. Resource server, signed token. Boot builds the
+  # decoder lazily from the issuer: the application starts without a reachable provider, and the
+  # first protected call answers 401 until one exists. The default issuer is the local Keycloak
+  # deferred to BL-05. No secret here: the provider's public keys are fetched, never configured.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OAUTH2_ISSUER_URI:http://localhost:8180/realms/bank}
+          audiences:
+            - ${OAUTH2_AUDIENCE:bank-app}
+
   # feature: flyway
   flyway:
     enabled: true
@@ -127,6 +139,7 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      roles: OPERATOR
       probes:
         enabled: true
   # feature: observability — the tracing bridge's export destination. Both signals are
@@ -162,6 +175,17 @@ logging:
 # feature: jobs — UC-002 20-persistencia.md § 5 (batch-size) + 35-jobs.md § 8 (the rest).
 # One `app.jobs` map: a job the project designs gets `app.jobs.<job-name>.*`.
 app:
+  # feature: security — UC-006 32-seguranca.md § 9. Empty allowed-origins registers no CORS mapping.
+  security:
+    api-docs-public: true
+    actuator-role: OPERATOR
+    cors:
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+    token:
+      principal-claim: sub
+      roles-claims: roles
+      scopes-claims: scope
+
   jobs:
     prune-idempotency-keys:
       enabled: true

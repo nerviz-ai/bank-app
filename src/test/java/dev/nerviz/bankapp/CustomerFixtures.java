@@ -34,8 +34,12 @@ public final class CustomerFixtures {
      */
     public static Customer withStatus(CustomerStatus status) {
         Customer base = customer();
-        return Customer.rehydrate(
-                base.id(), base.name(), base.securityNumber(), base.birthDate(), base.registeredAt(), status);
+        return Customer.rehydrate(base.id(), base.name(), base.identity(), base.registeredAt(), status);
+    }
+
+    /** Anonymized through the real transition, never rebuilt through {@code rehydrate}. */
+    public static Customer anonymized() {
+        return withStatus(CustomerStatus.ACTIVE).anonymize(FIXED_CLOCK);
     }
 
     public static CreateCustomerCommand command() {

@@ -3,6 +3,7 @@ package dev.nerviz.bankapp.domain.event;
 import dev.nerviz.bankapp.domain.exception.ValidationException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
+import dev.nerviz.bankapp.domain.model.CustomerIdentity;
 import dev.nerviz.bankapp.domain.model.SecurityNumber;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -30,11 +31,14 @@ public record KycVerificationRequested(
 
     /** {@code occurredAt} is the creation instant, already read from the injected {@code Clock}. */
     public static KycVerificationRequested of(Customer customer) {
+        if (!(customer.identity() instanceof CustomerIdentity.Identified identified)) {
+            throw new ValidationException(FIELD_REQUIRED, "securityNumber is required");
+        }
         return new KycVerificationRequested(
                 customer.id(),
                 customer.name(),
-                customer.securityNumber(),
-                customer.birthDate(),
+                identified.securityNumber(),
+                identified.birthDate(),
                 customer.registeredAt());
     }
 

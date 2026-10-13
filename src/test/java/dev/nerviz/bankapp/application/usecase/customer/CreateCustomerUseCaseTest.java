@@ -20,6 +20,7 @@ import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredExcept
 import dev.nerviz.bankapp.domain.exception.ValidationException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
+import dev.nerviz.bankapp.domain.model.CustomerIdentity;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -48,7 +49,10 @@ class CreateCustomerUseCaseTest {
         verify(customerRepository).save(captor.capture());
         Customer saved = captor.getValue();
         assertThat(saved.name()).isEqualTo(CustomerFixtures.NAME);
-        assertThat(saved.securityNumber().value()).isEqualTo(CustomerFixtures.SECURITY_NUMBER);
+        assertThat(((CustomerIdentity.Identified) saved.identity())
+                        .securityNumber()
+                        .value())
+                .isEqualTo(CustomerFixtures.SECURITY_NUMBER);
         assertThat(id).isEqualTo(saved.id());
     }
 
@@ -68,7 +72,7 @@ class CreateCustomerUseCaseTest {
                 .isEqualTo(new KycVerificationRequested(
                         saved.getValue().id(),
                         CustomerFixtures.NAME,
-                        saved.getValue().securityNumber(),
+                        ((CustomerIdentity.Identified) saved.getValue().identity()).securityNumber(),
                         CustomerFixtures.BIRTH_DATE,
                         CustomerFixtures.FIXED_CLOCK.instant()));
     }

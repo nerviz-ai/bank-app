@@ -3,6 +3,7 @@ package dev.nerviz.bankapp.domain.model;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.nerviz.bankapp.CustomerFixtures;
 import dev.nerviz.bankapp.domain.exception.BusinessRuleViolationException;
 import dev.nerviz.bankapp.domain.exception.ConflictException;
 import dev.nerviz.bankapp.domain.exception.ValidationException;
@@ -120,7 +121,7 @@ class CustomerTest {
 
         Customer customer = Customer.register(ID, "Maria Silva", SECURITY_NUMBER, the130thBirthdayToday, CLOCK);
 
-        assertThat(customer.birthDate()).isEqualTo(the130thBirthdayToday);
+        assertThat(birthDateOf(customer)).isEqualTo(the130thBirthdayToday);
     }
 
     @ParameterizedTest
@@ -145,7 +146,7 @@ class CustomerTest {
 
         Customer customer = Customer.register(ID, "Maria Silva", SECURITY_NUMBER, the18thBirthdayYesterday, CLOCK);
 
-        assertThat(customer.birthDate()).isEqualTo(the18thBirthdayYesterday);
+        assertThat(birthDateOf(customer)).isEqualTo(the18thBirthdayYesterday);
     }
 
     @Test
@@ -166,7 +167,7 @@ class CustomerTest {
 
         Customer customer = Customer.register(ID, "Maria Silva", SECURITY_NUMBER, leapDayBirth, onAnniversary);
 
-        assertThat(customer.birthDate()).isEqualTo(leapDayBirth);
+        assertThat(birthDateOf(customer)).isEqualTo(leapDayBirth);
     }
 
     @Test
@@ -174,15 +175,20 @@ class CustomerTest {
         LocalDate futureIfRulesReran = LocalDate.of(2015, 3, 10);
 
         Customer customer = Customer.rehydrate(
-                ID, "Maria Silva", SECURITY_NUMBER, futureIfRulesReran, CLOCK.instant(), CustomerStatus.ACTIVE);
+                ID,
+                "Maria Silva",
+                CustomerIdentity.identified(SECURITY_NUMBER, futureIfRulesReran),
+                CLOCK.instant(),
+                CustomerStatus.ACTIVE);
 
-        assertThat(customer.birthDate()).isEqualTo(futureIfRulesReran);
+        assertThat(birthDateOf(customer)).isEqualTo(futureIfRulesReran);
     }
 
     @Test
     void rejectsMissingRegisteredAtOnRehydrate() {
-        assertThatThrownBy(() -> Customer.rehydrate(
-                        ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, null, CustomerStatus.ACTIVE))
+        CustomerIdentity identity = CustomerIdentity.identified(SECURITY_NUMBER, VALID_BIRTH_DATE);
+
+        assertThatThrownBy(() -> Customer.rehydrate(ID, "Maria Silva", identity, null, CustomerStatus.ACTIVE))
                 .isInstanceOf(ValidationException.class)
                 .extracting("errorCode")
                 .isEqualTo("REGISTERED_AT_REQUIRED");
@@ -198,8 +204,12 @@ class CustomerTest {
     @ParameterizedTest
     @EnumSource(CustomerStatus.class)
     void rehydrateRestoresStatus(CustomerStatus persisted) {
-        Customer customer =
-                Customer.rehydrate(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK.instant(), persisted);
+        Customer customer = Customer.rehydrate(
+                ID,
+                "Maria Silva",
+                CustomerIdentity.identified(SECURITY_NUMBER, VALID_BIRTH_DATE),
+                CLOCK.instant(),
+                persisted);
 
         assertThat(customer.status()).isEqualTo(persisted);
     }
@@ -207,9 +217,9 @@ class CustomerTest {
     @Test
     void rejectsMissingStatus() {
         Instant registeredAt = CLOCK.instant();
+        CustomerIdentity identity = CustomerIdentity.identified(SECURITY_NUMBER, VALID_BIRTH_DATE);
 
-        assertThatThrownBy(() ->
-                        Customer.rehydrate(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, registeredAt, null))
+        assertThatThrownBy(() -> Customer.rehydrate(ID, "Maria Silva", identity, registeredAt, null))
                 .isInstanceOf(ValidationException.class)
                 .extracting("errorCode")
                 .isEqualTo("CUSTOMER_STATUS_REQUIRED");
@@ -219,15 +229,18 @@ class CustomerTest {
     @MethodSource("verdictsFromKycInProgress")
     void recordsVerdictFromKycInProgress(KycVerdict verdict, CustomerStatus expectedStatus) {
         Customer inProgress = Customer.rehydrate(
-                ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK.instant(), CustomerStatus.KYC_IN_PROGRESS);
+                ID,
+                "Maria Silva",
+                CustomerIdentity.identified(SECURITY_NUMBER, VALID_BIRTH_DATE),
+                CLOCK.instant(),
+                CustomerStatus.KYC_IN_PROGRESS);
 
         Customer moved = inProgress.recordKycVerdict(verdict);
 
         assertThat(moved.status()).isEqualTo(expectedStatus);
         assertThat(moved.id()).isEqualTo(inProgress.id());
         assertThat(moved.name()).isEqualTo(inProgress.name());
-        assertThat(moved.securityNumber()).isEqualTo(inProgress.securityNumber());
-        assertThat(moved.birthDate()).isEqualTo(inProgress.birthDate());
+        assertThat(moved.identity()).isEqualTo(inProgress.identity());
         assertThat(moved.registeredAt()).isEqualTo(inProgress.registeredAt());
     }
 
@@ -240,8 +253,12 @@ class CustomerTest {
     @ParameterizedTest
     @MethodSource("finalStatusesWithTheirVerdict")
     void sameVerdictOnFinalStatusIsNoOp(CustomerStatus finalStatus, KycVerdict verdict) {
-        Customer onFinalStatus =
-                Customer.rehydrate(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK.instant(), finalStatus);
+        Customer onFinalStatus = Customer.rehydrate(
+                ID,
+                "Maria Silva",
+                CustomerIdentity.identified(SECURITY_NUMBER, VALID_BIRTH_DATE),
+                CLOCK.instant(),
+                finalStatus);
 
         Customer result = onFinalStatus.recordKycVerdict(verdict);
 
@@ -257,8 +274,12 @@ class CustomerTest {
     @ParameterizedTest
     @MethodSource("finalStatusesWithOppositeVerdict")
     void oppositeVerdictOnFinalStatusConflicts(CustomerStatus finalStatus, KycVerdict verdict) {
-        Customer onFinalStatus =
-                Customer.rehydrate(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK.instant(), finalStatus);
+        Customer onFinalStatus = Customer.rehydrate(
+                ID,
+                "Maria Silva",
+                CustomerIdentity.identified(SECURITY_NUMBER, VALID_BIRTH_DATE),
+                CLOCK.instant(),
+                finalStatus);
 
         assertThatThrownBy(() -> onFinalStatus.recordKycVerdict(verdict))
                 .isInstanceOf(ConflictException.class)
@@ -275,11 +296,110 @@ class CustomerTest {
     @Test
     void rejectsMissingVerdict() {
         Customer inProgress = Customer.rehydrate(
-                ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK.instant(), CustomerStatus.KYC_IN_PROGRESS);
+                ID,
+                "Maria Silva",
+                CustomerIdentity.identified(SECURITY_NUMBER, VALID_BIRTH_DATE),
+                CLOCK.instant(),
+                CustomerStatus.KYC_IN_PROGRESS);
 
         assertThatThrownBy(() -> inProgress.recordKycVerdict(null))
                 .isInstanceOf(ValidationException.class)
                 .extracting("errorCode")
                 .isEqualTo("KYC_VERDICT_REQUIRED");
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = CustomerStatus.class,
+            names = {"ACTIVE", "REJECTED_BY_KYC"})
+    void anonymizesFinalStatusCustomer(CustomerStatus finalStatus) {
+        Customer customer = Customer.rehydrate(
+                ID,
+                "Maria Silva",
+                CustomerIdentity.identified(SECURITY_NUMBER, VALID_BIRTH_DATE),
+                CLOCK.instant(),
+                finalStatus);
+
+        Customer anonymized = customer.anonymize(CLOCK);
+
+        assertThat(anonymized.name()).isEqualTo(Customer.ANONYMIZED_NAME);
+        assertThat(anonymized.identity()).isEqualTo(new CustomerIdentity.Anonymized(CLOCK.instant()));
+        assertThat(anonymized.isAnonymized()).isTrue();
+        assertThat(anonymized.status()).isEqualTo(finalStatus);
+        assertThat(anonymized.id()).isEqualTo(ID);
+        assertThat(anonymized.registeredAt()).isEqualTo(customer.registeredAt());
+    }
+
+    @Test
+    void anonymizeReturnsSameInstanceWhenAlreadyAnonymized() {
+        Clock later = Clock.fixed(Instant.parse("2026-01-16T10:00:00Z"), ZoneOffset.UTC);
+        Customer anonymized = CustomerFixtures.anonymized();
+
+        Customer again = anonymized.anonymize(later);
+
+        assertThat(again).isSameAs(anonymized);
+        assertThat(again.identity()).isEqualTo(new CustomerIdentity.Anonymized(CLOCK.instant()));
+    }
+
+    @Test
+    void refusesAnonymizationWhileKycInProgress() {
+        Customer inProgress = Customer.register(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK);
+
+        assertThatThrownBy(() -> inProgress.anonymize(CLOCK))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .extracting("errorCode")
+                .isEqualTo("CUSTOMER_KYC_IN_PROGRESS");
+    }
+
+    @Test
+    void isNotAnonymizedWhileIdentified() {
+        Customer customer = Customer.register(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK);
+
+        assertThat(customer.isAnonymized()).isFalse();
+    }
+
+    @Test
+    void rejectsAnonymizedIdentityWithRealName() {
+        CustomerIdentity anonymous = CustomerIdentity.anonymized(CLOCK.instant());
+        Instant registeredAt = CLOCK.instant();
+
+        assertThatThrownBy(() -> Customer.rehydrate(ID, "Maria Silva", anonymous, registeredAt, CustomerStatus.ACTIVE))
+                .isInstanceOf(ValidationException.class)
+                .extracting("errorCode")
+                .isEqualTo("CUSTOMER_ANONYMIZED_NAME_MISMATCH");
+    }
+
+    @Test
+    void rejectsMissingIdentity() {
+        Instant registeredAt = CLOCK.instant();
+
+        assertThatThrownBy(() -> Customer.rehydrate(ID, "Maria Silva", null, registeredAt, CustomerStatus.ACTIVE))
+                .isInstanceOf(ValidationException.class)
+                .extracting("errorCode")
+                .isEqualTo("CUSTOMER_IDENTITY_REQUIRED");
+    }
+
+    @Test
+    void recordKycVerdictKeepsIdentity() {
+        Customer anonymized = CustomerFixtures.anonymized();
+
+        Customer same = anonymized.recordKycVerdict(KycVerdict.APPROVED);
+
+        assertThat(same.identity()).isEqualTo(anonymized.identity());
+        assertThat(same.name()).isEqualTo(Customer.ANONYMIZED_NAME);
+    }
+
+    @Test
+    void toStringMasksName() {
+        Customer customer = Customer.register(ID, "Maria Silva", SECURITY_NUMBER, VALID_BIRTH_DATE, CLOCK);
+
+        assertThat(customer.toString())
+                .doesNotContain("Maria Silva")
+                .doesNotContain("12345678901")
+                .doesNotContain("1990-05-17");
+    }
+
+    private static LocalDate birthDateOf(Customer customer) {
+        return ((CustomerIdentity.Identified) customer.identity()).birthDate();
     }
 }

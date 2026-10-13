@@ -1,5 +1,5 @@
 ---
-status: approved
+status: implemented
 ---
 
 # UC-006 — Anonymize customer
@@ -218,25 +218,25 @@ The local identity provider is not a row here: it is deferred to `BL-05` (§ Out
 
 ## Implementation order (checklist)
 
-- [ ] 1. Domain exceptions — n/a, family REUSE; new `errorCode`s only (`10-dominio.md` § 2)
-- [ ] 2. Value objects + constructor validation — `CustomerIdentity` (sealed, two records)
-- [ ] 3. Aggregate + invariants — `Customer` (`identity`, `anonymize`, `isAnonymized`, `ANONYMIZED_NAME`, masked `toString`); `KycVerificationRequested.of` reads `identity()`
-- [ ] 4. Events — n/a, none
-- [ ] 5. Use case command — `AnonymizeCustomerCommand`
-- [ ] 6. Use case — `AnonymizeCustomerUseCase`
-- [ ] 7. Output ports — n/a, `CustomerRepository` unchanged
-- [ ] 8. Migration — materialize `V5__anonymize_customers.sql` from `20-persistencia.md` § 4
-- [ ] 9. Persistence entity — `CustomerEntity` changes
-- [ ] 10. Spring Data interface — n/a, unchanged
-- [ ] 11. Repository adapter — `CustomerPersistenceMapper`, `CustomerRepositoryJpaAdapter.save`
-- [ ] 12. Persistence properties — n/a, none
-- [ ] 13. DTOs + manual mapper — `CustomerDetailsResponse`, `CustomerMapper`
-- [ ] 14. Controller + contract interface + `ApiExceptionHandler` — `CustomerApi`, `CustomerController`, `AnonymizeCustomerOpenApiDocs`, OpenAPI changes on the two existing docs; handler unchanged
-- [ ] 15. Idempotency — n/a, `DELETE` needs no key
-- [ ] 16. Test fixtures — `CustomerFixtures`
-- [ ] 17. Unit tests
-- [ ] 18. Integration + contract tests
-- [ ] 19. `./mvnw verify` — green build, coverage gate
+- [x] 1. Domain exceptions — n/a, family REUSE; new `errorCode`s only (`10-dominio.md` § 2)
+- [x] 2. Value objects + constructor validation — `CustomerIdentity` (sealed, two records)
+- [x] 3. Aggregate + invariants — `Customer` (`identity`, `anonymize`, `isAnonymized`, `ANONYMIZED_NAME`, masked `toString`); `KycVerificationRequested.of` reads `identity()`
+- [x] 4. Events — n/a, none
+- [x] 5. Use case command — `AnonymizeCustomerCommand`
+- [x] 6. Use case — `AnonymizeCustomerUseCase`
+- [x] 7. Output ports — n/a, `CustomerRepository` unchanged
+- [x] 8. Migration — materialize `V5__anonymize_customers.sql` from `20-persistencia.md` § 4
+- [x] 9. Persistence entity — `CustomerEntity` changes
+- [x] 10. Spring Data interface — n/a, unchanged
+- [x] 11. Repository adapter — `CustomerPersistenceMapper`, `CustomerRepositoryJpaAdapter.save`
+- [x] 12. Persistence properties — n/a, none
+- [x] 13. DTOs + manual mapper — `CustomerDetailsResponse`, `CustomerMapper`
+- [x] 14. Controller + contract interface + `ApiExceptionHandler` — `CustomerApi`, `CustomerController`, `AnonymizeCustomerOpenApiDocs`, OpenAPI changes on the two existing docs; handler unchanged
+- [x] 15. Idempotency — n/a, `DELETE` needs no key
+- [x] 16. Test fixtures — `CustomerFixtures`
+- [x] 17. Unit tests
+- [x] 18. Integration + contract tests
+- [x] 19. `./mvnw verify` — green build, coverage gate
 
 Block S (security, `32-seguranca.md` § Implementation order) runs right after step 14.
 

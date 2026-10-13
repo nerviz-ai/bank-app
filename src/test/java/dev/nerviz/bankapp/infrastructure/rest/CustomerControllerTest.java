@@ -2,23 +2,38 @@ package dev.nerviz.bankapp.infrastructure.rest;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.nerviz.bankapp.CustomerFixtures;
+import dev.nerviz.bankapp.application.usecase.customer.AnonymizeCustomerCommand;
+import dev.nerviz.bankapp.application.usecase.customer.AnonymizeCustomerUseCase;
 import dev.nerviz.bankapp.application.usecase.customer.CreateCustomerUseCase;
 import dev.nerviz.bankapp.application.usecase.customer.GetCustomerUseCase;
 import dev.nerviz.bankapp.domain.exception.BusinessRuleViolationException;
+import dev.nerviz.bankapp.domain.exception.ConflictException;
+import dev.nerviz.bankapp.domain.exception.CustomerNotFoundException;
 import dev.nerviz.bankapp.domain.exception.NotFoundException;
 import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredException;
 import dev.nerviz.bankapp.domain.exception.ValidationException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
 import dev.nerviz.bankapp.domain.model.CustomerStatus;
+import dev.nerviz.bankapp.infrastructure.config.security.JwtResourceServerConfig;
+import dev.nerviz.bankapp.infrastructure.config.security.ProblemDetailAccessDeniedHandler;
+import dev.nerviz.bankapp.infrastructure.config.security.ProblemDetailAuthenticationEntryPoint;
+import dev.nerviz.bankapp.infrastructure.config.security.Roles;
+import dev.nerviz.bankapp.infrastructure.config.security.SecurityConfig;
 import io.micrometer.tracing.Tracer;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -30,9 +45,13 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
  * Web slice: HTTP contract only. Business rules have their own test at the domain and
@@ -41,10 +60,24 @@ import org.springframework.test.web.servlet.MockMvc;
  * {@code CreateCustomerIdempotencyIT} — a double here proves nothing about a replay.
  */
 @WebMvcTest(CustomerController.class)
+@Import({
+    SecurityConfig.class,
+    JwtResourceServerConfig.class,
+    ProblemDetailAuthenticationEntryPoint.class,
+    ProblemDetailAccessDeniedHandler.class
+})
 class CustomerControllerTest {
 
     private static final String VALID_KEY = "0f2b6c1e-4d3a-4f5b-9c8d-7e6f5a4b3c2d";
     private static final String UNKNOWN_ID = "00000000-0000-7000-8000-000000000000";
+
+    private static RequestPostProcessor officer() {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_" + Roles.DATA_PROTECTION_OFFICER));
+    }
+
+    private static RequestPostProcessor operator() {
+        return jwt().authorities(new SimpleGrantedAuthority("ROLE_" + Roles.OPERATOR));
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -54,6 +87,13 @@ class CustomerControllerTest {
 
     @MockitoBean
     private GetCustomerUseCase getCustomer;
+
+    @MockitoBean
+    private AnonymizeCustomerUseCase anonymizeCustomer;
+
+    /** The chain's token mechanism needs a decoder; tokens are posted with {@code jwt()}, never decoded. */
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     /** ApiExceptionHandler injects Tracer. Without this double the slice doesn't start. */
     @MockitoBean
@@ -276,7 +316,8 @@ class CustomerControllerTest {
         Customer customer = CustomerFixtures.customer();
         given(getCustomer.get(any())).willReturn(customer);
 
-        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + customer.id().value()))
+        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + customer.id().value())
+                        .with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.id").value(customer.id().value().toString()))
@@ -292,7 +333,8 @@ class CustomerControllerTest {
         Customer customer = CustomerFixtures.withStatus(status);
         given(getCustomer.get(any())).willReturn(customer);
 
-        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + customer.id().value()))
+        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + customer.id().value())
+                        .with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(status.name()));
     }
@@ -313,14 +355,14 @@ class CustomerControllerTest {
     void answersNotFoundForUnknownId() throws Exception {
         given(getCustomer.get(any())).willThrow(new NotFoundException("CUSTOMER_NOT_FOUND", "customer not found"));
 
-        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID))
+        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(jwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("CUSTOMER_NOT_FOUND"));
     }
 
     @Test
     void rejectsIdThatIsNotUuid() throws Exception {
-        mockMvc.perform(get(CustomerController.BASE_PATH + "/abc"))
+        mockMvc.perform(get(CustomerController.BASE_PATH + "/abc").with(jwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.violations[0].field").value("customerId"))
                 .andExpect(jsonPath("$.errorCode").doesNotExist());
@@ -330,7 +372,7 @@ class CustomerControllerTest {
     void hidesInternalFailureOnReadBehindTraceId() throws Exception {
         given(getCustomer.get(any())).willThrow(new IllegalStateException("boom"));
 
-        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID))
+        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(jwt()))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.traceId").exists())
                 .andExpect(jsonPath("$.detail").value("Internal error"));
@@ -340,7 +382,8 @@ class CustomerControllerTest {
     void neverEchoesPersonalDataInNotFound() throws Exception {
         given(getCustomer.get(any())).willThrow(new NotFoundException("CUSTOMER_NOT_FOUND", "customer not found"));
 
-        String body = mockMvc.perform(get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID))
+        String body = mockMvc.perform(
+                        get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(jwt()))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -348,5 +391,124 @@ class CustomerControllerTest {
         org.assertj.core.api.Assertions.assertThat(body)
                 .doesNotContain(CustomerFixtures.SECURITY_NUMBER)
                 .doesNotContain(CustomerFixtures.BIRTH_DATE.toString());
+    }
+
+    @Test
+    void getAnonymizedCustomerOmitsPersonalData() throws Exception {
+        Customer anonymized = CustomerFixtures.anonymized();
+        given(getCustomer.get(any())).willReturn(anonymized);
+
+        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + anonymized.id().value())
+                        .with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value(Customer.ANONYMIZED_NAME))
+                .andExpect(jsonPath("$.securityNumber").doesNotExist())
+                .andExpect(jsonPath("$.birthDate").doesNotExist())
+                .andExpect(jsonPath("$.id").value(anonymized.id().value().toString()))
+                .andExpect(jsonPath("$.registeredAt").exists())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    void getWithoutTokenReturns401() throws Exception {
+        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("WWW-Authenticate", "Bearer"));
+
+        verify(getCustomer, never()).get(any());
+    }
+
+    @Test
+    void createWithoutTokenReturns201() throws Exception {
+        given(createCustomer.create(any())).willReturn(CustomerId.of(UUID.randomUUID()));
+
+        mockMvc.perform(post(CustomerController.BASE_PATH)
+                        .header("Idempotency-Key", VALID_KEY)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CustomerFixtures.requestJson()))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void anonymizeReturns204() throws Exception {
+        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(officer()))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        verify(anonymizeCustomer).anonymize(new AnonymizeCustomerCommand(UUID.fromString(UNKNOWN_ID)));
+    }
+
+    @Test
+    void anonymizeAlreadyAnonymizedReturns204() throws Exception {
+        willDoNothing().given(anonymizeCustomer).anonymize(any());
+
+        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(officer()))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+    }
+
+    @Test
+    void anonymizeUnknownIdReturns204() throws Exception {
+        willThrow(new CustomerNotFoundException()).given(anonymizeCustomer).anonymize(any());
+
+        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(officer()))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+    }
+
+    @Test
+    void anonymizeKycInProgressReturns422() throws Exception {
+        willThrow(new BusinessRuleViolationException("CUSTOMER_KYC_IN_PROGRESS", "kyc in progress"))
+                .given(anonymizeCustomer)
+                .anonymize(any());
+
+        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(officer()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("CUSTOMER_KYC_IN_PROGRESS"));
+    }
+
+    @Test
+    void anonymizeConcurrentWriterReturns409() throws Exception {
+        willThrow(new ConflictException("CUSTOMER_CONCURRENT_UPDATE", "changed by another writer"))
+                .given(anonymizeCustomer)
+                .anonymize(any());
+
+        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(officer()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("CUSTOMER_CONCURRENT_UPDATE"));
+    }
+
+    @Test
+    void anonymizeMalformedIdReturns400() throws Exception {
+        mockMvc.perform(delete(CustomerController.BASE_PATH + "/not-a-uuid").with(officer()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").doesNotExist());
+
+        verify(anonymizeCustomer, never()).anonymize(any());
+    }
+
+    @Test
+    void anonymizeWithoutTokenReturns401() throws Exception {
+        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("WWW-Authenticate", "Bearer"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.traceId").exists())
+                .andExpect(jsonPath("$.errorCode").doesNotExist());
+
+        verify(anonymizeCustomer, never()).anonymize(any());
+    }
+
+    @Test
+    void anonymizeWithoutRoleReturns403() throws Exception {
+        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(operator()))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.traceId").exists())
+                .andExpect(jsonPath("$.errorCode").doesNotExist());
+
+        verify(anonymizeCustomer, never()).anonymize(any());
     }
 }
