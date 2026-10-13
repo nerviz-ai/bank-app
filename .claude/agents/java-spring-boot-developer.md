@@ -499,6 +499,28 @@ Validation, document family: no `@DBRef`/`@DocumentReference` across aggregates,
 `MongoCustomConversions` bean, no `spring.data.mongodb.uri`, the `outbox_events` and
 `idempotency_keys` of this family from `MongoSharedCollections.java.example`.
 
+**Audit** — when `20-persistencia.md` § Audit is not `none`. The exemplars are
+`.claude/skills/persistence-architect/templates/Audit*.java.example`,
+`SystemActor.java.example`, `V1__create_audit_tables.sql.example` and
+`application-audit.yml.example`:
+- every entity § Audit lists gets `@EntityListeners(AuditingEntityListener.class)` and an embedded
+  `AuditStamps`; for `history`, `@Audited` too, and `@NotAudited` exactly on the fields § Audit
+  keeps out. Once per project, when step 2 of the partial found them missing: `AuditStamps`,
+  `AuditingConfig` with `AuditorResolver` (never on the application class), and for `history`
+  `AuditRevision` with its listener; `SystemActor` in the package `packages.map` names
+  `commons.audit`
+- the `_aud` tables and, the first time, `revinfo` and its sequence — materialized from § 4 like
+  any migration; the Envers properties of § 5
+- the history adapter over `RevisionRepository` when § Audit names a read port, and the
+  `AuditHistoryRetentionGateway` implementation with this case's `_aud` tables added to its list
+- § 6's `spring-data-envers` and, in a project without Spring Security, `spring-security-core` —
+  never the security starter
+
+Validation, audit: no stamp on `AssignedIdEntity`, no `List` child without `@OrderColumn` in an
+audited aggregate, no `NOT NULL` on a non-key `_aud` column, a `long` revision timestamp, no
+`@Modifying` query over an audited entity that § Audit does not list, `@EnableJpaAuditing` absent
+from the `@SpringBootApplication` class (`.claude/rules/persistence.md` § Auditing).
+
 Compilation: `./mvnw -q -pl <persistence-module> test-compile` in multi-module, `./mvnw -q test-compile` in single-module ✅
 
 **Line in the final report:**
@@ -676,6 +698,23 @@ the step at hand. Generates:
 - Response DTO — `record`
 - `[Resource]RestMapper.java` — manual (no `@Mapping`), domain ↔ DTO
 - `ApiExceptionHandler.java` — `@RestControllerAdvice`, 5 error shapes (422, 404, 409, 400, 500 with `traceId`)
+- `ApiVersioningConfig.java` and `ApiVersionObservationConvention.java` — the first REST case of
+  the project, when `30-rest.md` § 7 · Versioning says NEW; CHANGE only for the version, deprecation
+  or sunset that section lists. Every handler method carries the `version` the partial's endpoint
+  table gives (`1+`), and no class mapping spells `/api/v1` — the prefix is the config's
+  (`.claude/rules/api-rest.md` § Versioning)
+- Admission, only when `30-rest.md` § 8 (or `31-graphql.md` § 6's `Admission` rows) is not `none`
+  — exemplars `.claude/skills/rest-api-architect/templates/AdmissionConfig.java.example` and
+  `application-admission.yml.example`. When the setup is NEW: the `admission` subpackage
+  (`InboundQuota`, `QuotaExceededException`, `AdmissionProperties`, `InboundQuotaInterceptor`,
+  `AdmissionConfig`), `app.admission` in `application.yml`, and the two admission handlers of
+  `ApiExceptionHandler` (the `SERVICE_BUSY` case of `GraphQlExceptionResolver` too, when the
+  project has GraphQL). Then the case's limits: `@InboundQuota("<slug>")` on the handler and its
+  `app.admission.quotas` entry with the **stated** quota (the interceptor divides it), and
+  `@Bulkhead(name = "inbound-<slug>")` with its instance, `max-wait-duration: 0`. Never a
+  `RateLimiterRegistry`, never an `@Order` on `IdempotencyAspect`, never `bulkhead-aspect-order`
+  (`.claude/rules/inbound-admission.md`). With `Quota enforced: edge`, no quota entry and no
+  `@InboundQuota`
 - `IdempotencyKeyInterceptor.java` (if needed) — and, the first time, the transactional half the
   partial cites: `IdempotencyKeyStore`, `IdempotentExecution`. The controller calls
   `IdempotentExecution`; the command never carries the key (`.claude/rules/api-rest.md`
@@ -733,7 +772,11 @@ Block S because the security annotations go on both. The exemplars are in
   batch registry's max size, the schema inspection that fails the startup) and
   `GraphQlExceptionResolver` (the families of § 7, `null` for the rest — never a catch-all); the
   properties of § 12 in `application.yml`; the dependencies of § 11 in `pom.xml`, version empty.
-  Inherited → nothing here but a new property § 12 adds
+  Inherited → nothing here but a new property § 12 adds. § 6's `Admission` rows not `none` → the
+  admission pieces Block 3 lists, in `[graphql]`'s `admission` subpackage when the project has no
+  REST adapter (Block 3 skipped): the `graphql` quota entry, `@Bulkhead(name = "inbound-<slug>")`
+  on the root field's method, `SERVICE_BUSY` in `GraphQlExceptionResolver`, and the 429 handler in
+  an `ApiExceptionHandler` — the quota is refused before GraphQL runs
 - **G2 · Schema and resolvers** — the types of § 2 in `src/main/resources/graphql/<aggregate>.graphqls`,
   extending an existing type additively, never redeclaring it. In `[graphql]`: one record per
   schema type, named as the type; the mapper from the port's read model; the controller with one
@@ -849,7 +892,8 @@ Form A and the consumer generate:
 - `[Event]Payload.java` (`adapter/in/messaging`) — mirrors the producer's shape
 - `[Event]Listener.java` — `@KafkaListener`, dedupes via `ProcessedEventStore` before
   calling the target use case's inbound port, manual `Acknowledgment` committed only
-  after that call returns
+  after that call returns. When the use case writes an audited aggregate (spec § 3 Audit not
+  `none`), the call runs inside `SystemActor.run("<consumer-name>", …)`
 - `ProcessedEventStore` port + its persistence adapter — only if Block 2 modeled the
   dedupe table per `25-mensageria.md` step 5a. Missing table and the partial named the
   need → spec defect, stop and report; this block doesn't design schema
@@ -961,7 +1005,10 @@ scheduler because a class looked easier with it:
   nothing else; trigger, cadence placeholder, zone, on/off property and lock bounds exactly as
   the row says. Under Form B, `OutboxRelayJob` records the two delivery metrics from each
   pass's `RelayOutcome`, and `OutboxPruneJob` goes with `PruneOutboxEvents`, its service and
-  `OutboxRetentionGateway` (the application side) — the gateway's implementation is Block 2's
+  `OutboxRetentionGateway` (the application side) — the gateway's implementation is Block 2's.
+  `AuditHistoryPruneJob` follows the same shape with `PruneAuditHistory` and
+  `AuditHistoryRetentionGateway`. A trigger whose inbound port writes an audited aggregate wraps
+  the call in `SystemActor.run("<job-name>", …)`
 - **J3 · Configuration** — the properties of § 8 in `application.yml`, and **every job's
   on/off property set to `false` in `src/test/resources/application-test.yml`**
 

@@ -145,6 +145,16 @@ what's left to cover outside of transport.
    § 1 exists, that a duplicate business key is a conflict, that an update raises the version, that
    an older shape is upcast, and that a failed transaction leaves nothing written.
 
+   **An audited aggregate, when `20-persistencia.md` § Audit is not `none`:** an integration test
+   against the real engine that **commits** — `@SpringBootTest` with `TransactionTemplate`, never a
+   rolled-back `@DataJpaTest`, which sees no history and passes for the wrong reason
+   (`templates/AuditHistoryIT.java.example`). Cases, each only where § Audit has the item: the
+   stamps on the live row with `created` kept on update; for `history`, create, update and delete
+   read back through the read port, newest first, each with its actor; a job's or consumer's actor
+   as `system:<name>`; a write with no authentication failing; each bulk write § Audit lists
+   leaving no revision; the prune keeping the current version. The context starting is itself the
+   check that the `_aud` migrations match the mapping (`ddl-auto: validate`).
+
    **`23-busca.md`, when it exists, fixes cases this partial must test** — against the real engine
    (`templates/SearchIndexIT.java.example`, the same image and tag as the compose service): the
    alias exists at startup, each § 3 query finds by its match fields and pages by its cursor, a
@@ -174,6 +184,16 @@ what's left to cover outside of transport.
    Caching stays on in every test, and the caches are cleared between tests that share a context.
    The Redis image tag is pinned like every other container's, and `ArchHook.java compose`
    compares it with the compose file's.
+
+   **`30-rest.md` § 8 or `31-graphql.md` § 6, when either states a limit, fixes the admission
+   cases** — through the real server and chain, never a web slice: the bulkhead aspect is not part
+   of one. A quota: spent → 429 with `Retry-After` and `RATE_LIMITED`, another caller keeps theirs,
+   an anonymous request answers 401 and spends nothing. A cap: full → 503 with `Retry-After`,
+   `SERVICE_BUSY` and `traceId`, and on an `@Idempotent` handler the rejected call claims no key.
+   GraphQL: a spent quota is HTTP 429 before any port runs, a full cap the root field `null` with
+   `SERVICE_BUSY` (`@.claude/rules/inbound-admission.md` § Tests) — shape in
+   `templates/AdmissionIT.java.example`, with the limits lowered for that class only. With `Quota
+   enforced: edge` the quota cases are not written here: the edge is not in the test.
 
 2. **Survey what already exists.**
 
@@ -295,7 +315,7 @@ question nobody asked.
 | Block | Fixes | Shape exemplar |
 |---|---|---|
 | Distribution by level | Each behavior, the level it's tested at, and why | `DomainTest.java.example` |
-| Cases per test class | Class name, each method's name, what it asserts | `UseCaseTest.java.example` · `ControllerTest.java.example` · `SecuredControllerTest.java.example` (when `32-seguranca.md` exists) · `GraphQlControllerTest.java.example`, `GraphQlHttpIT.java.example`, `GraphQlSchemaCompatibilityTest.java.example` (when `31-graphql.md` exists) · `HttpClientAdapterIT.java.example` (when `28-cliente-http.md` exists) · `CachedAdapterIT.java.example` (when `22-cache.md` exists) · `AiAdapterContractTest.java.example`, `AiProviderIT.java.example`, `VectorStoreIT.java.example` (when `29-ia.md` exists) · `SearchIndexIT.java.example` (when `23-busca.md` exists) · `PersistenceIT.java.example`, or `MongoPersistenceIT.java.example` for an aggregate of the document family · `IdempotencyKeyInterceptorTest.java.example` (when `30-rest.md` requires `Idempotency-Key`) |
+| Cases per test class | Class name, each method's name, what it asserts | `UseCaseTest.java.example` · `ControllerTest.java.example` · `SecuredControllerTest.java.example` (when `32-seguranca.md` exists) · `GraphQlControllerTest.java.example`, `GraphQlHttpIT.java.example`, `GraphQlSchemaCompatibilityTest.java.example` (when `31-graphql.md` exists) · `HttpClientAdapterIT.java.example` (when `28-cliente-http.md` exists) · `CachedAdapterIT.java.example` (when `22-cache.md` exists) · `AiAdapterContractTest.java.example`, `AiProviderIT.java.example`, `VectorStoreIT.java.example` (when `29-ia.md` exists) · `SearchIndexIT.java.example` (when `23-busca.md` exists) · `PersistenceIT.java.example`, or `MongoPersistenceIT.java.example` for an aggregate of the document family · `AuditHistoryIT.java.example` (when `20-persistencia.md` § Audit is not `none`) · `IdempotencyKeyInterceptorTest.java.example` (when `30-rest.md` requires `Idempotency-Key`) · `AdmissionIT.java.example` (when `30-rest.md` § 8 or `31-graphql.md` § 6 states a limit) |
 | Data and doubles | Factories, meaningful fields, substituted ports, clock | `TestFixtures.java.example` |
 | Coverage and gaps | Invariants with no test, and what's deliberately left uncovered | `@.claude/rules/testing.md` § Coverage |
 | Test dependencies | Test-scoped libraries the build doesn't declare yet — the executor's only license to add them | `@.claude/rules/testing.md` § Asynchronous effects |
