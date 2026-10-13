@@ -44,6 +44,8 @@ import org.testcontainers.DockerClientFactory;
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class AnonymizeCustomerIT {
 
+    private static final String CUSTOMERS = "/api/v1/customers";
+
     static boolean dockerAvailable() {
         return DockerClientFactory.instance().isDockerAvailable();
     }
@@ -64,7 +66,7 @@ class AnonymizeCustomerIT {
     @Test
     void officerAnonymizesActiveCustomerAndReadShowsNoPersonalData() throws Exception {
         Customer active = customerRepository.save(CustomerFixtures.withStatus(CustomerStatus.ACTIVE));
-        String path = CustomerController.BASE_PATH + "/" + active.id().value();
+        String path = CUSTOMERS + "/" + active.id().value();
 
         mockMvc.perform(delete(path).with(officer()))
                 .andExpect(status().isNoContent())
@@ -93,7 +95,7 @@ class AnonymizeCustomerIT {
 
     @Test
     void freshCustomerIsRefusedWhileKycInProgress() throws Exception {
-        String location = mockMvc.perform(post(CustomerController.BASE_PATH)
+        String location = mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", "0190f3b2-6c1e-7a40-9b8e-2f1d4c5a6ba0")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CustomerFixtures.requestJson()))
@@ -110,7 +112,7 @@ class AnonymizeCustomerIT {
 
     @Test
     void unknownIdIsAnsweredAsSuccess() throws Exception {
-        mockMvc.perform(delete(CustomerController.BASE_PATH + "/00000000-0000-7000-8000-000000000000")
+        mockMvc.perform(delete(CUSTOMERS + "/00000000-0000-7000-8000-000000000000")
                         .with(officer()))
                 .andExpect(status().isNoContent());
     }

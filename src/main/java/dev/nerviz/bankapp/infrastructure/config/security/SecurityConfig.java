@@ -26,7 +26,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private static final String[] API_DOCS = {"/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html"};
-    private static final String CUSTOMERS = "/api/v1/customers";
+    private static final String CUSTOMERS = "/api/*/customers";
 
     private final AuthenticationMechanism mechanism;
     private final ProblemDetailAuthenticationEntryPoint entryPoint;
@@ -58,8 +58,9 @@ public class SecurityConfig {
     }
 
     /**
-     * Specific to general. {@code POST /api/v1/customers} is public by UC-001's decision, kept
-     * in UC-006 ({@code 32-seguranca.md} § 1).
+     * Specific to general, every path naming all API versions of its route
+     * ({@.claude/rules/authorization.md} § Default access). {@code POST /api/*}{@code /customers}
+     * is public by UC-001's decision, kept in UC-006 ({@code 32-seguranca.md} § 1).
      */
     private void requestRules(
             AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry requests) {

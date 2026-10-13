@@ -36,6 +36,8 @@ import org.testcontainers.DockerClientFactory;
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class CreateCustomerOutboxIT {
 
+    private static final String CUSTOMERS = "/api/v1/customers";
+
     static boolean dockerAvailable() {
         return DockerClientFactory.instance().isDockerAvailable();
     }
@@ -48,7 +50,7 @@ class CreateCustomerOutboxIT {
 
     @Test
     void creationRecordsOneOutboxRowWithPayload() throws Exception {
-        String location = mockMvc.perform(post(CustomerController.BASE_PATH)
+        String location = mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", "0190f3b2-6c1e-7a40-9b8e-2f1d4c5a6b90")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CustomerFixtures.requestJson()))
@@ -87,7 +89,7 @@ class CreateCustomerOutboxIT {
                         + " VALUES (gen_random_uuid(), 'Already Here', ?, DATE '1980-01-01', now(), 'ACTIVE')",
                 CustomerFixtures.SECURITY_NUMBER);
 
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", "0190f3b2-6c1e-7a40-9b8e-2f1d4c5a6b91")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CustomerFixtures.requestJson()))
@@ -101,7 +103,7 @@ class CreateCustomerOutboxIT {
     void idempotentReplayRecordsNoSecondRow() throws Exception {
         String key = "0190f3b2-6c1e-7a40-9b8e-2f1d4c5a6b92";
         for (int attempt = 0; attempt < 2; attempt++) {
-            mockMvc.perform(post(CustomerController.BASE_PATH)
+            mockMvc.perform(post(CUSTOMERS)
                             .header("Idempotency-Key", key)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(CustomerFixtures.requestJson()))

@@ -68,6 +68,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 })
 class CustomerControllerTest {
 
+    private static final String CUSTOMERS = "/api/v1/customers";
     private static final String VALID_KEY = "0f2b6c1e-4d3a-4f5b-9c8d-7e6f5a4b3c2d";
     private static final String UNKNOWN_ID = "00000000-0000-7000-8000-000000000000";
 
@@ -104,12 +105,12 @@ class CustomerControllerTest {
         CustomerId id = CustomerId.of(UUID.randomUUID());
         given(createCustomer.create(any())).willReturn(id);
 
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CustomerFixtures.requestJson()))
                 .andExpect(status().isCreated())
-                .andExpect(header().string("Location", CustomerController.BASE_PATH + "/" + id.value()))
+                .andExpect(header().string("Location", CUSTOMERS + "/" + id.value()))
                 .andExpect(jsonPath("$.id").value(id.value().toString()));
     }
 
@@ -119,7 +120,7 @@ class CustomerControllerTest {
                 .given(createCustomer)
                 .create(any());
 
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CustomerFixtures.requestJson()))
@@ -133,7 +134,7 @@ class CustomerControllerTest {
                 .given(createCustomer)
                 .create(any());
 
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CustomerFixtures.requestJson()))
@@ -148,7 +149,7 @@ class CustomerControllerTest {
                 .given(createCustomer)
                 .create(any());
 
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -164,7 +165,7 @@ class CustomerControllerTest {
                 .given(createCustomer)
                 .create(any());
 
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -181,7 +182,7 @@ class CustomerControllerTest {
                 .given(createCustomer)
                 .create(any());
 
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -201,7 +202,7 @@ class CustomerControllerTest {
                 .given(createCustomer)
                 .create(any());
 
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -217,7 +218,7 @@ class CustomerControllerTest {
                 .given(createCustomer)
                 .create(any());
 
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -230,7 +231,7 @@ class CustomerControllerTest {
     @ParameterizedTest
     @ValueSource(strings = {"name", "securityNumber", "birthDate"})
     void rejectsMissingField(String missingField) throws Exception {
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bodyMissing(missingField)))
@@ -254,7 +255,7 @@ class CustomerControllerTest {
 
     @Test
     void rejectsUnparseableBirthDate() throws Exception {
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -266,9 +267,7 @@ class CustomerControllerTest {
 
     @Test
     void rejectsMissingIdempotencyKey() throws Exception {
-        mockMvc.perform(post(CustomerController.BASE_PATH)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(CustomerFixtures.requestJson()))
+        mockMvc.perform(post(CUSTOMERS).contentType(MediaType.APPLICATION_JSON).content(CustomerFixtures.requestJson()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -276,7 +275,7 @@ class CustomerControllerTest {
     void hidesInternalFailureBehindTraceId() throws Exception {
         willThrow(new IllegalStateException("boom")).given(createCustomer).create(any());
 
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CustomerFixtures.requestJson()))
@@ -290,7 +289,7 @@ class CustomerControllerTest {
     void neverEchoesPersonalDataInErrors(RuntimeException thrown) throws Exception {
         willThrow(thrown).given(createCustomer).create(any());
 
-        String body = mockMvc.perform(post(CustomerController.BASE_PATH)
+        String body = mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CustomerFixtures.requestJson()))
@@ -316,8 +315,7 @@ class CustomerControllerTest {
         Customer customer = CustomerFixtures.customer();
         given(getCustomer.get(any())).willReturn(customer);
 
-        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + customer.id().value())
-                        .with(jwt()))
+        mockMvc.perform(get(CUSTOMERS + "/" + customer.id().value()).with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.id").value(customer.id().value().toString()))
@@ -333,8 +331,7 @@ class CustomerControllerTest {
         Customer customer = CustomerFixtures.withStatus(status);
         given(getCustomer.get(any())).willReturn(customer);
 
-        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + customer.id().value())
-                        .with(jwt()))
+        mockMvc.perform(get(CUSTOMERS + "/" + customer.id().value()).with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(status.name()));
     }
@@ -343,7 +340,7 @@ class CustomerControllerTest {
     void createResponseHasNoStatus() throws Exception {
         given(createCustomer.create(any())).willReturn(CustomerId.of(UUID.randomUUID()));
 
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CustomerFixtures.requestJson()))
@@ -355,14 +352,14 @@ class CustomerControllerTest {
     void answersNotFoundForUnknownId() throws Exception {
         given(getCustomer.get(any())).willThrow(new NotFoundException("CUSTOMER_NOT_FOUND", "customer not found"));
 
-        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(jwt()))
+        mockMvc.perform(get(CUSTOMERS + "/" + UNKNOWN_ID).with(jwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("CUSTOMER_NOT_FOUND"));
     }
 
     @Test
     void rejectsIdThatIsNotUuid() throws Exception {
-        mockMvc.perform(get(CustomerController.BASE_PATH + "/abc").with(jwt()))
+        mockMvc.perform(get(CUSTOMERS + "/abc").with(jwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.violations[0].field").value("customerId"))
                 .andExpect(jsonPath("$.errorCode").doesNotExist());
@@ -372,7 +369,7 @@ class CustomerControllerTest {
     void hidesInternalFailureOnReadBehindTraceId() throws Exception {
         given(getCustomer.get(any())).willThrow(new IllegalStateException("boom"));
 
-        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(jwt()))
+        mockMvc.perform(get(CUSTOMERS + "/" + UNKNOWN_ID).with(jwt()))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.traceId").exists())
                 .andExpect(jsonPath("$.detail").value("Internal error"));
@@ -382,8 +379,7 @@ class CustomerControllerTest {
     void neverEchoesPersonalDataInNotFound() throws Exception {
         given(getCustomer.get(any())).willThrow(new NotFoundException("CUSTOMER_NOT_FOUND", "customer not found"));
 
-        String body = mockMvc.perform(
-                        get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(jwt()))
+        String body = mockMvc.perform(get(CUSTOMERS + "/" + UNKNOWN_ID).with(jwt()))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -398,8 +394,7 @@ class CustomerControllerTest {
         Customer anonymized = CustomerFixtures.anonymized();
         given(getCustomer.get(any())).willReturn(anonymized);
 
-        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + anonymized.id().value())
-                        .with(jwt()))
+        mockMvc.perform(get(CUSTOMERS + "/" + anonymized.id().value()).with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value(Customer.ANONYMIZED_NAME))
                 .andExpect(jsonPath("$.securityNumber").doesNotExist())
@@ -411,7 +406,7 @@ class CustomerControllerTest {
 
     @Test
     void getWithoutTokenReturns401() throws Exception {
-        mockMvc.perform(get(CustomerController.BASE_PATH + "/" + UNKNOWN_ID))
+        mockMvc.perform(get(CUSTOMERS + "/" + UNKNOWN_ID))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string("WWW-Authenticate", "Bearer"));
 
@@ -422,7 +417,7 @@ class CustomerControllerTest {
     void createWithoutTokenReturns201() throws Exception {
         given(createCustomer.create(any())).willReturn(CustomerId.of(UUID.randomUUID()));
 
-        mockMvc.perform(post(CustomerController.BASE_PATH)
+        mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", VALID_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CustomerFixtures.requestJson()))
@@ -431,7 +426,7 @@ class CustomerControllerTest {
 
     @Test
     void anonymizeReturns204() throws Exception {
-        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(officer()))
+        mockMvc.perform(delete(CUSTOMERS + "/" + UNKNOWN_ID).with(officer()))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
 
@@ -442,7 +437,7 @@ class CustomerControllerTest {
     void anonymizeAlreadyAnonymizedReturns204() throws Exception {
         willDoNothing().given(anonymizeCustomer).anonymize(any());
 
-        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(officer()))
+        mockMvc.perform(delete(CUSTOMERS + "/" + UNKNOWN_ID).with(officer()))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
     }
@@ -451,7 +446,7 @@ class CustomerControllerTest {
     void anonymizeUnknownIdReturns204() throws Exception {
         willThrow(new CustomerNotFoundException()).given(anonymizeCustomer).anonymize(any());
 
-        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(officer()))
+        mockMvc.perform(delete(CUSTOMERS + "/" + UNKNOWN_ID).with(officer()))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
     }
@@ -462,7 +457,7 @@ class CustomerControllerTest {
                 .given(anonymizeCustomer)
                 .anonymize(any());
 
-        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(officer()))
+        mockMvc.perform(delete(CUSTOMERS + "/" + UNKNOWN_ID).with(officer()))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.errorCode").value("CUSTOMER_KYC_IN_PROGRESS"));
     }
@@ -473,14 +468,14 @@ class CustomerControllerTest {
                 .given(anonymizeCustomer)
                 .anonymize(any());
 
-        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(officer()))
+        mockMvc.perform(delete(CUSTOMERS + "/" + UNKNOWN_ID).with(officer()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("CUSTOMER_CONCURRENT_UPDATE"));
     }
 
     @Test
     void anonymizeMalformedIdReturns400() throws Exception {
-        mockMvc.perform(delete(CustomerController.BASE_PATH + "/not-a-uuid").with(officer()))
+        mockMvc.perform(delete(CUSTOMERS + "/not-a-uuid").with(officer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").doesNotExist());
 
@@ -489,7 +484,7 @@ class CustomerControllerTest {
 
     @Test
     void anonymizeWithoutTokenReturns401() throws Exception {
-        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID))
+        mockMvc.perform(delete(CUSTOMERS + "/" + UNKNOWN_ID))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string("WWW-Authenticate", "Bearer"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
@@ -502,7 +497,7 @@ class CustomerControllerTest {
 
     @Test
     void anonymizeWithoutRoleReturns403() throws Exception {
-        mockMvc.perform(delete(CustomerController.BASE_PATH + "/" + UNKNOWN_ID).with(operator()))
+        mockMvc.perform(delete(CUSTOMERS + "/" + UNKNOWN_ID).with(operator()))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(403))
@@ -510,5 +505,16 @@ class CustomerControllerTest {
                 .andExpect(jsonPath("$.errorCode").doesNotExist());
 
         verify(anonymizeCustomer, never()).anonymize(any());
+    }
+
+    @Test
+    void unsupportedApiVersionReturns400WithViolationOnVersion() throws Exception {
+        mockMvc.perform(get("/api/v99/customers/" + UNKNOWN_ID).with(jwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.violations[0].field").value("version"))
+                .andExpect(jsonPath("$.errorCode").doesNotExist());
+
+        verify(getCustomer, never()).get(any());
     }
 }

@@ -22,13 +22,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import org.springframework.web.util.UriComponentsBuilder;
 
-/** Explicit version in the path — never {@code server.servlet.context-path}. */
+/**
+ * The class mapping is the resource alone: the {@code /api/v{version}} prefix comes from
+ * {@code ApiVersioningConfig}, never {@code server.servlet.context-path}. Every handler declares
+ * its baseline version ({@.claude/rules/api-rest.md} § Versioning).
+ */
 @RestController
-@RequestMapping(path = CustomerController.BASE_PATH, produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(path = "/customers", produces = MediaType.APPLICATION_JSON_VALUE)
 public class CustomerController implements CustomerApi {
-
-    public static final String BASE_PATH = "/api/v1/customers";
 
     private final CreateCustomerUseCase createCustomer;
     private final GetCustomerUseCase getCustomer;
@@ -45,16 +49,17 @@ public class CustomerController implements CustomerApi {
 
     /**
      * {@code @Idempotent} wraps this method in the claim/replay transaction. 201 carries
-     * {@code Location} + the created representation — a relative URI built from
-     * {@code BASE_PATH} ({@.claude/rules/api-rest.md} § Success statuses).
+     * {@code Location} + the created representation — a relative URI built from the path this
+     * request arrived on, so a v2 call answers a v2 location ({@.claude/rules/api-rest.md}
+     * § Success statuses).
      */
     @Override
     @Idempotent(bodyArgIndex = 0)
-    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(version = "1+", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<CustomerResponse> create(@Valid @RequestBody CreateCustomerRequest request) {
         CustomerId id = createCustomer.create(CustomerMapper.toCommand(request));
         CustomerResponse body = CustomerMapper.toResponse(id);
-        return ResponseEntity.created(URI.create(BASE_PATH + "/" + body.id())).body(body);
+        return ResponseEntity.created(locationOf(body.id().toString())).body(body);
     }
 
     /**
@@ -62,7 +67,7 @@ public class CustomerController implements CustomerApi {
      * and must stay out of browser and intermediary caches.
      */
     @Override
-    @GetMapping("/{customerId}")
+    @GetMapping(path = "/{customerId}", version = "1+")
     public ResponseEntity<CustomerDetailsResponse> get(@PathVariable UUID customerId) {
         CustomerDetailsResponse body =
                 CustomerMapper.toDetailsResponse(getCustomer.get(CustomerMapper.toGetCommand(customerId)));
@@ -76,7 +81,7 @@ public class CustomerController implements CustomerApi {
      * keeps its 404 for the same exception.
      */
     @Override
-    @DeleteMapping("/{customerId}")
+    @DeleteMapping(path = "/{customerId}", version = "1+")
     public ResponseEntity<Void> anonymize(@PathVariable UUID customerId) {
         try {
             anonymizeCustomer.anonymize(CustomerMapper.toAnonymizeCommand(customerId));
@@ -84,5 +89,11 @@ public class CustomerController implements CustomerApi {
             // answered as success by decision of UC-006 30-rest.md
         }
         return ResponseEntity.noContent().build();
+    }
+
+    private static URI locationOf(String id) {
+        String collection =
+                ServletUriComponentsBuilder.fromCurrentRequestUri().build().getPath();
+        return UriComponentsBuilder.fromPath(collection).pathSegment(id).build().toUri();
     }
 }

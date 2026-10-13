@@ -35,6 +35,8 @@ import org.testcontainers.DockerClientFactory;
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class GetCustomerIT {
 
+    private static final String CUSTOMERS = "/api/v1/customers";
+
     static boolean dockerAvailable() {
         return DockerClientFactory.instance().isDockerAvailable();
     }
@@ -44,7 +46,7 @@ class GetCustomerIT {
 
     @Test
     void createdLocationResolvesToTheCustomer() throws Exception {
-        String location = mockMvc.perform(post(CustomerController.BASE_PATH)
+        String location = mockMvc.perform(post(CUSTOMERS)
                         .header("Idempotency-Key", "0190f3b2-6c1e-7a40-9b8e-2f1d4c5a6b80")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CustomerFixtures.requestJson()))

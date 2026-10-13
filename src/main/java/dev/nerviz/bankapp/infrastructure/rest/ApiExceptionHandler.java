@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.accept.InvalidApiVersionException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -69,6 +70,18 @@ public class ApiExceptionHandler {
     public ProblemDetail handleMissingIdempotencyKey(MissingIdempotencyKeyException e, HttpServletRequest request) {
         log.debug("Missing/malformed Idempotency-Key at {}", request.getRequestURI());
         return invalidRequest(request, List.of(new Violation(IdempotencyKeyInterceptor.HEADER, e.getMessage())));
+    }
+
+    /**
+     * A version outside {@code ApiVersioningConfig}'s supported list — never offered, or past its
+     * sunset. Structural: thrown while the handler is looked up, before any controller, so
+     * {@code violations} on {@code version} and never {@code errorCode}. Also covers
+     * {@code NotAcceptableApiVersionException}, its subclass.
+     */
+    @ExceptionHandler(InvalidApiVersionException.class)
+    public ProblemDetail handleUnsupportedApiVersion(InvalidApiVersionException e, HttpServletRequest request) {
+        log.debug("Unsupported API version at {}", request.getRequestURI());
+        return invalidRequest(request, List.of(new Violation("version", "is not a supported API version")));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

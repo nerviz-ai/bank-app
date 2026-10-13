@@ -41,7 +41,7 @@ class SecurityChainIT {
 
     private static final String LISTED_ORIGIN = "https://app.example.com";
     private static final String OTHER_ORIGIN = "https://evil.example.com";
-    private static final String CUSTOMER_PATH = CustomerController.BASE_PATH + "/00000000-0000-7000-8000-000000000000";
+    private static final String CUSTOMER_PATH = "/api/v1/customers/00000000-0000-7000-8000-000000000000";
 
     static boolean dockerAvailable() {
         return DockerClientFactory.instance().isDockerAvailable();
