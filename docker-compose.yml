@@ -18,6 +18,9 @@ services:
       OTLP_METRICS_ENDPOINT: http://otel-collector:4318/v1/metrics
       # UC-004 / UC-005 — the broker's compose-network listener (PLAINTEXT), never EXTERNAL.
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # UC-006 — the local issuer by its compose hostname; a token for `app` is fetched at
+      # keycloak:8080 so its `iss` matches. Resolved lazily: no depends_on.
+      OAUTH2_ISSUER_URI: http://keycloak:8080/realms/bank
     depends_on:
       postgres:
         condition: service_healthy
@@ -104,6 +107,36 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # UC-006 (32-seguranca.md § 11, BL-05) — local identity provider for ./mvnw spring-boot:run.
+  # Imports realm `bank` (audience `bank-app`, flat `roles` claim, users `dpo` and `operator`)
+  # at start. The token's `iss` follows the host the client used to fetch it:
+  # http://localhost:${KEYCLOAK_PORT:-8180}/realms/bank from the host (application.yml's
+  # default), http://keycloak:8080/realms/bank inside the compose network (`app`'s override). Dev mode, embedded H2, no volume on purpose: the realm file
+  # is the state and is re-imported on every new container. Dev-only, never a shared server.
+  # Every password comes from .env; the realm file holds only ${...} placeholders.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KEYCLOAK_DPO_PASSWORD: ${KEYCLOAK_DPO_PASSWORD:?set KEYCLOAK_DPO_PASSWORD in .env}
+      KEYCLOAK_OPERATOR_PASSWORD: ${KEYCLOAK_OPERATOR_PASSWORD:?set KEYCLOAK_OPERATOR_PASSWORD in .env}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "${KEYCLOAK_PORT:-8180}:8080"
+    volumes:
+      - ./docker/init/keycloak/bank-realm.json:/opt/keycloak/data/import/bank-realm.json:ro
+    # Management interface (9000) answers /health/ready. The image ships no curl, so the
+    # probe is a raw HTTP request over bash's /dev/tcp.
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\": \"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
 
 volumes:
   postgres-data:

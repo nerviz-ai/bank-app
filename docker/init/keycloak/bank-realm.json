@@ -1,0 +1,72 @@
+{
+  "realm": "bank",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "accessTokenLifespan": 900,
+  "roles": {
+    "realm": [
+      { "name": "DATA_PROTECTION_OFFICER", "description": "May anonymize a customer (UC-006)" },
+      { "name": "OPERATOR", "description": "May read operational Actuator endpoints" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "bank-app-local",
+      "name": "Local developer client",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "fullScopeAllowed": true,
+      "protocolMappers": [
+        {
+          "name": "audience-bank-app",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "bank-app",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "flat-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "multivalued": "true",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "dpo",
+      "enabled": true,
+      "firstName": "Data Protection",
+      "lastName": "Officer",
+      "email": "dpo@bank.local",
+      "emailVerified": true,
+      "realmRoles": ["DATA_PROTECTION_OFFICER"],
+      "credentials": [{ "type": "password", "value": "${KEYCLOAK_DPO_PASSWORD}", "temporary": false }]
+    },
+    {
+      "username": "operator",
+      "enabled": true,
+      "firstName": "Local",
+      "lastName": "Operator",
+      "email": "operator@bank.local",
+      "emailVerified": true,
+      "realmRoles": ["OPERATOR"],
+      "credentials": [{ "type": "password", "value": "${KEYCLOAK_OPERATOR_PASSWORD}", "temporary": false }]
+    }
+  ]
+}
