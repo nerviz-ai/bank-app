@@ -9,7 +9,7 @@ import org.springframework.kafka.config.TopicBuilder;
 /**
  * Adapter-local wiring ({@code .claude/rules/messaging.md} § Boundary). Holds the topic-name
  * constant {@link KycVerificationCompletedListener} subscribes to, and declares its DLQ
- * alongside it — the recoverer in {@code listener.KafkaListenerConfig} only computes the name
+ * alongside it — {@code listener.MonitoredDeadLetterPublisher} only computes the name
  * ({@code <topic>.dlq}), it doesn't provision the topic.
  */
 @Configuration

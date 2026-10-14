@@ -21,7 +21,7 @@ import dev.nerviz.bankapp.application.usecase.customer.AnonymizeCustomerUseCase;
 import dev.nerviz.bankapp.application.usecase.customer.CreateCustomerUseCase;
 import dev.nerviz.bankapp.application.usecase.customer.GetCustomerUseCase;
 import dev.nerviz.bankapp.domain.exception.BusinessRuleViolationException;
-import dev.nerviz.bankapp.domain.exception.ConflictException;
+import dev.nerviz.bankapp.domain.exception.ConcurrentUpdateException;
 import dev.nerviz.bankapp.domain.exception.CustomerNotFoundException;
 import dev.nerviz.bankapp.domain.exception.NotFoundException;
 import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredException;
@@ -464,7 +464,8 @@ class CustomerControllerTest {
 
     @Test
     void anonymizeConcurrentWriterReturns409() throws Exception {
-        willThrow(new ConflictException("CUSTOMER_CONCURRENT_UPDATE", "changed by another writer"))
+        willThrow(new ConcurrentUpdateException(
+                        "CUSTOMER_CONCURRENT_UPDATE", "changed by another writer", new IllegalStateException()))
                 .given(anonymizeCustomer)
                 .anonymize(any());
 

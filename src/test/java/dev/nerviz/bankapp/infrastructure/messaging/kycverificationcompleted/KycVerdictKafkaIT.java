@@ -42,7 +42,7 @@ import org.testcontainers.kafka.KafkaContainer;
 
 /**
  * End to end through a real broker: conversion, the error handler's classification, the
- * dead-letter recoverer and manual offsets are container behaviour, not unit-testable
+ * dead-letter recoverer and offset commits are container behaviour, not unit-testable
  * (40-tests.md § 2). The listener container is turned back on against a Testcontainers broker
  * — {@code application-test.yml} otherwise leaves it off.
  */

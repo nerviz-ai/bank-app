@@ -1,6 +1,7 @@
 package dev.nerviz.bankapp.infrastructure.persistence.customer;
 
 import dev.nerviz.bankapp.application.port.CustomerRepository;
+import dev.nerviz.bankapp.domain.exception.ConcurrentUpdateException;
 import dev.nerviz.bankapp.domain.exception.ConflictException;
 import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredException;
 import dev.nerviz.bankapp.domain.model.Customer;
@@ -58,13 +59,17 @@ class CustomerRepositoryJpaAdapter implements CustomerRepository {
         } catch (DataIntegrityViolationException cause) {
             throw translate(cause);
         } catch (ObjectOptimisticLockingFailureException cause) {
-            throw new ConflictException("CUSTOMER_CONCURRENT_UPDATE", "customer was changed concurrently", cause);
+            throw concurrentUpdate(cause);
         }
     }
 
     @Override
     public Optional<Customer> findById(CustomerId id) {
         return repository.findById(id.value()).map(CustomerPersistenceMapper::toDomain);
+    }
+
+    private static ConcurrentUpdateException concurrentUpdate(ObjectOptimisticLockingFailureException cause) {
+        return new ConcurrentUpdateException("CUSTOMER_CONCURRENT_UPDATE", "customer was changed concurrently", cause);
     }
 
     private static RuntimeException translate(DataIntegrityViolationException cause) {

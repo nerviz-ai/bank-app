@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -20,28 +19,25 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.kafka.support.Acknowledgment;
 
-/** Adapter translation only — no broker needed; the use case and {@link Acknowledgment} are doubles. */
+/** Adapter translation only — no broker needed; the use case is a double. */
 class KycVerificationCompletedListenerTest {
 
     private static final UUID EVENT_ID = UUID.randomUUID();
     private static final UUID CUSTOMER_ID = UUID.randomUUID();
 
     private final RecordKycVerdictUseCase recordKycVerdict = mock(RecordKycVerdictUseCase.class);
-    private final Acknowledgment acknowledgment = mock(Acknowledgment.class);
     private final KycVerificationCompletedListener listener = new KycVerificationCompletedListener(recordKycVerdict);
 
     @ParameterizedTest
     @MethodSource("wireVerdictsAndTheirDomainCounterpart")
-    void mapsPayloadAndAcknowledges(String wireVerdict, KycVerdict verdict) {
+    void mapsPayloadToTheUseCase(String wireVerdict, KycVerdict verdict) {
         KycVerificationCompletedPayload payload =
                 new KycVerificationCompletedPayload(EVENT_ID, CUSTOMER_ID, wireVerdict);
 
-        listener.onMessage(payload, acknowledgment);
+        listener.onMessage(payload);
 
         verify(recordKycVerdict).recordVerdict(eq(new RecordKycVerdictCommand(CUSTOMER_ID, verdict)));
-        verify(acknowledgment).acknowledge();
     }
 
     private static Stream<Arguments> wireVerdictsAndTheirDomainCounterpart() {
@@ -54,13 +50,12 @@ class KycVerificationCompletedListenerTest {
         KycVerificationCompletedPayload payload =
                 new KycVerificationCompletedPayload(EVENT_ID, CUSTOMER_ID, unknownVerdict);
 
-        assertThatThrownBy(() -> listener.onMessage(payload, acknowledgment))
+        assertThatThrownBy(() -> listener.onMessage(payload))
                 .isInstanceOf(ValidationException.class)
                 .extracting("errorCode")
                 .isEqualTo("KYC_VERDICT_UNKNOWN");
 
         verifyNoInteractions(recordKycVerdict);
-        verify(acknowledgment, never()).acknowledge();
     }
 
     private static Stream<Arguments> unknownVerdicts() {
@@ -68,14 +63,11 @@ class KycVerificationCompletedListenerTest {
     }
 
     @Test
-    void doesNotAcknowledgeWhenUseCaseThrows() {
+    void propagatesUseCaseFailureToTheContainer() {
         KycVerificationCompletedPayload payload =
                 new KycVerificationCompletedPayload(EVENT_ID, CUSTOMER_ID, "APPROVED");
         willThrow(new CustomerNotFoundException()).given(recordKycVerdict).recordVerdict(any());
 
-        assertThatThrownBy(() -> listener.onMessage(payload, acknowledgment))
-                .isInstanceOf(CustomerNotFoundException.class);
-
-        verify(acknowledgment, never()).acknowledge();
+        assertThatThrownBy(() -> listener.onMessage(payload)).isInstanceOf(CustomerNotFoundException.class);
     }
 }

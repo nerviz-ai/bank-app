@@ -109,7 +109,6 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     listener:
-      ack-mode: manual
       # Overridden to false in application-test.yml: the test profile starts no broker.
       auto-startup: true
 

@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import dev.nerviz.bankapp.TestcontainersConfiguration;
-import dev.nerviz.bankapp.domain.exception.ConflictException;
+import dev.nerviz.bankapp.domain.exception.ConcurrentUpdateException;
 import dev.nerviz.bankapp.domain.exception.SecurityNumberAlreadyRegisteredException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
@@ -188,7 +188,7 @@ class CustomerRepositoryJpaAdapterIT {
         Customer staleUpdate = withStatus(customer, CustomerStatus.ACTIVE);
 
         assertThatThrownBy(() -> adapter.save(staleUpdate))
-                .isInstanceOf(ConflictException.class)
+                .isInstanceOf(ConcurrentUpdateException.class)
                 .extracting("errorCode")
                 .isEqualTo("CUSTOMER_CONCURRENT_UPDATE");
     }
