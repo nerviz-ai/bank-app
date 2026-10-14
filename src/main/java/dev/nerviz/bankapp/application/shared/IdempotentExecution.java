@@ -6,6 +6,9 @@ import dev.nerviz.bankapp.application.port.IdempotencyRequest;
 import dev.nerviz.bankapp.application.port.StoredResponse;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -16,15 +19,12 @@ import org.springframework.transaction.support.TransactionOperations;
  * retry runs again instead of waiting out the lease.
  */
 @Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class IdempotentExecution {
 
-    private final IdempotencyKeyPort idempotencyKeys;
-    private final TransactionOperations transactions;
-
-    public IdempotentExecution(IdempotencyKeyPort idempotencyKeys, TransactionOperations transactions) {
-        this.idempotencyKeys = idempotencyKeys;
-        this.transactions = transactions;
-    }
+    IdempotencyKeyPort idempotencyKeys;
+    TransactionOperations transactions;
 
     public <R> IdempotentOutcome<R> execute(
             IdempotencyRequest request, Supplier<R> effect, Function<R, StoredResponse> recorder) {

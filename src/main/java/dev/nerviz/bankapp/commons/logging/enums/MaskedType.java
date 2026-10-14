@@ -1,6 +1,9 @@
 package dev.nerviz.bankapp.commons.logging.enums;
 
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 
 /**
  * Predefined masking regexes for {@code @MaskSensitiveData}. {@code @Getter} on {@code regex}
@@ -10,6 +13,8 @@ import lombok.Getter;
  * since {@code MaskSensitiveData} ({@code annotations}) is its only consumer.
  */
 @Getter
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public enum MaskedType {
     ALL("\\S"),
     EMAIL(".(?=.{4})(?=[^@])(?=[^@]{4})."),
@@ -21,9 +26,5 @@ public enum MaskedType {
     NUMBER("\\d"),
     TELEPHONE(".(?=.{2})[^-]");
 
-    private final String regex;
-
-    MaskedType(String regex) {
-        this.regex = regex;
-    }
+    String regex;
 }

@@ -5,9 +5,11 @@ import dev.nerviz.bankapp.application.port.OutboxEventSender;
 import dev.nerviz.bankapp.application.port.OutboxSendResult;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.KafkaException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
@@ -18,18 +20,15 @@ import org.springframework.stereotype.Component;
  * {@code max.block.ms}. Logs outcome and latency, never the payload.
  */
 @Component
+@Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class KafkaOutboxEventSender implements OutboxEventSender {
 
-    private static final Logger log = LoggerFactory.getLogger(KafkaOutboxEventSender.class);
     private static final double NANOS_PER_MILLI = 1_000_000d;
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final TopicResolver topics;
-
-    KafkaOutboxEventSender(KafkaTemplate<String, String> kafkaTemplate, TopicResolver topics) {
-        this.kafkaTemplate = kafkaTemplate;
-        this.topics = topics;
-    }
+    KafkaTemplate<String, String> kafkaTemplate;
+    TopicResolver topics;
 
     @Override
     public OutboxSendResult send(OutboxEventRecord event) {

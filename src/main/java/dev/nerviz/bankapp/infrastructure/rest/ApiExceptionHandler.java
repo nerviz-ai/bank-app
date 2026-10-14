@@ -12,8 +12,10 @@ import io.micrometer.tracing.Tracer;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -31,15 +33,12 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
  * registers the {@code Tracer} bean on Spring Boot 4.
  */
 @RestControllerAdvice
+@Slf4j
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class ApiExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
-
-    private final Tracer tracer;
-
-    public ApiExceptionHandler(Tracer tracer) {
-        this.tracer = tracer;
-    }
+    Tracer tracer;
 
     @ExceptionHandler(NotFoundException.class)
     public ProblemDetail handleNotFound(NotFoundException e, HttpServletRequest request) {

@@ -8,6 +8,9 @@ import dev.nerviz.bankapp.domain.exception.ConflictException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
@@ -19,16 +22,14 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * their own, outside any business transaction; {@code complete} joins it.
  */
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class IdempotencyKeyStore implements IdempotencyKeyPort {
 
     private static final Duration TTL = Duration.ofHours(24);
     private static final Duration IN_PROGRESS_LEASE = Duration.ofMinutes(5);
 
-    private final IdempotencyKeyJpaRepository repository;
-
-    IdempotencyKeyStore(IdempotencyKeyJpaRepository repository) {
-        this.repository = repository;
-    }
+    IdempotencyKeyJpaRepository repository;
 
     @Override
     public IdempotencyClaim claim(IdempotencyRequest request) {

@@ -12,6 +12,10 @@ import dev.nerviz.bankapp.infrastructure.rest.idempotent.Idempotent;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,22 +34,16 @@ import org.springframework.web.util.UriComponentsBuilder;
  * {@code ApiVersioningConfig}, never {@code server.servlet.context-path}. Every handler declares
  * its baseline version ({@.claude/rules/api-rest.md} § Versioning).
  */
+@Slf4j
 @RestController
 @RequestMapping(path = "/customers", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class CustomerController implements CustomerApi {
 
-    private final CreateCustomerUseCase createCustomer;
-    private final GetCustomerUseCase getCustomer;
-    private final AnonymizeCustomerUseCase anonymizeCustomer;
-
-    public CustomerController(
-            CreateCustomerUseCase createCustomer,
-            GetCustomerUseCase getCustomer,
-            AnonymizeCustomerUseCase anonymizeCustomer) {
-        this.createCustomer = createCustomer;
-        this.getCustomer = getCustomer;
-        this.anonymizeCustomer = anonymizeCustomer;
-    }
+    CreateCustomerUseCase createCustomer;
+    GetCustomerUseCase getCustomer;
+    AnonymizeCustomerUseCase anonymizeCustomer;
 
     /**
      * {@code @Idempotent} wraps this method in the claim/replay transaction. 201 carries
@@ -86,7 +84,10 @@ public class CustomerController implements CustomerApi {
         try {
             anonymizeCustomer.anonymize(CustomerMapper.toAnonymizeCommand(customerId));
         } catch (CustomerNotFoundException e) {
-            // answered as success by decision of UC-006 30-rest.md
+            log.warn(
+                    "Anonymize answered 204 for an unknown customer, by decision of UC-006 30-rest.md: customerId={} errorCode={}",
+                    customerId,
+                    e.errorCode());
         }
         return ResponseEntity.noContent().build();
     }

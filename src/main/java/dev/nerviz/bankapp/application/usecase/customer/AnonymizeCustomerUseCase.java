@@ -7,6 +7,9 @@ import dev.nerviz.bankapp.domain.exception.CustomerNotFoundException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
 import java.time.Clock;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,15 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
  * already-anonymized customer writes nothing.
  */
 @Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AnonymizeCustomerUseCase {
 
-    private final CustomerRepository customerRepository;
-    private final Clock clock;
-
-    public AnonymizeCustomerUseCase(CustomerRepository customerRepository, Clock clock) {
-        this.customerRepository = customerRepository;
-        this.clock = clock;
-    }
+    CustomerRepository customerRepository;
+    Clock clock;
 
     /**
      * @throws CustomerNotFoundException {@code CUSTOMER_NOT_FOUND} — no customer has this id

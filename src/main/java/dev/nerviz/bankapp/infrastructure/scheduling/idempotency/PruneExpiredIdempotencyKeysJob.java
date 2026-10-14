@@ -3,8 +3,10 @@ package dev.nerviz.bankapp.infrastructure.scheduling.idempotency;
 import dev.nerviz.bankapp.application.usecase.idempotency.PruneExpiredIdempotencyKeysCommand;
 import dev.nerviz.bankapp.application.usecase.idempotency.PruneExpiredIdempotencyKeysUseCase;
 import dev.nerviz.bankapp.infrastructure.scheduling.JobRunRecorder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -22,22 +24,14 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "app.jobs.prune-idempotency-keys.enabled", matchIfMissing = true)
 @EnableConfigurationProperties(PruneIdempotencyKeysJobProperties.class)
+@Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class PruneExpiredIdempotencyKeysJob {
 
-    private static final Logger log = LoggerFactory.getLogger(PruneExpiredIdempotencyKeysJob.class);
-
-    private final PruneExpiredIdempotencyKeysUseCase pruneExpiredIdempotencyKeys;
-    private final PruneIdempotencyKeysJobProperties properties;
-    private final JobRunRecorder recorder;
-
-    PruneExpiredIdempotencyKeysJob(
-            PruneExpiredIdempotencyKeysUseCase pruneExpiredIdempotencyKeys,
-            PruneIdempotencyKeysJobProperties properties,
-            JobRunRecorder recorder) {
-        this.pruneExpiredIdempotencyKeys = pruneExpiredIdempotencyKeys;
-        this.properties = properties;
-        this.recorder = recorder;
-    }
+    PruneExpiredIdempotencyKeysUseCase pruneExpiredIdempotencyKeys;
+    PruneIdempotencyKeysJobProperties properties;
+    JobRunRecorder recorder;
 
     /**
      * Fixed delay: the next run starts a set interval after the previous one finished, so a slow

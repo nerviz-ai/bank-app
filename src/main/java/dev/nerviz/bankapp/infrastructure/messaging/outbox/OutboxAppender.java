@@ -4,6 +4,9 @@ import com.fasterxml.uuid.Generators;
 import dev.nerviz.bankapp.application.port.OutboxEventRecord;
 import dev.nerviz.bankapp.application.port.OutboxRelayGateway;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -16,17 +19,14 @@ import tools.jackson.databind.json.JsonMapper;
  * run inside it — the gateway refuses to append outside one.
  */
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class OutboxAppender {
 
     private static final int INITIAL_ATTEMPTS = 0;
 
-    private final OutboxRelayGateway gateway;
-    private final JsonMapper jsonMapper;
-
-    OutboxAppender(OutboxRelayGateway gateway, JsonMapper jsonMapper) {
-        this.gateway = gateway;
-        this.jsonMapper = jsonMapper;
-    }
+    OutboxRelayGateway gateway;
+    JsonMapper jsonMapper;
 
     /** UUID v7, the row's identity and the id any receiver dedupes on. */
     public String nextEventId() {

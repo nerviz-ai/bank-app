@@ -160,7 +160,7 @@ que o gerou:
 - `arch-doctor` — diagnostica a configuração de IA e a aplicação da arquitetura nesta máquina
 - `audit-usage` — lê o rastro de `.claude/audit-usage/` e reporta gasto, duração e falhas por execução
 - `docker-architect` — dono único de todo bloco de serviço em `docker-compose.yml`/`Dockerfile` adicionado depois da geração
-- `domain-modeling` — detalha domínio e aplicação de um caso de uso já desenhado em `10-dominio.md`
+- `domain-modeling` — detalha domínio e aplicação de um caso de uso já desenhado em `10-domain.md`
 - `git-publish` — oferece git init/commit e criar+push um repositório GitHub, atrás de duas confirmações
 - `gof-design-patterns` — escolhe e implementa um padrão de projeto a partir do sintoma que o justifica
 - `http-client-architect` — desenha o adaptador HTTP de saída de um caso de uso já modelado

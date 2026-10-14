@@ -6,6 +6,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -18,14 +21,12 @@ import org.springframework.http.server.ServletServerHttpResponse;
  * {@code ApiExceptionHandler} (500): the body is written here, with the same converter family
  * and the same shape. The body names no reason — no missing role, no token error.
  */
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 final class SecurityProblemWriter {
 
-    private final JacksonJsonHttpMessageConverter converter = new JacksonJsonHttpMessageConverter();
-    private final Tracer tracer;
-
-    SecurityProblemWriter(Tracer tracer) {
-        this.tracer = tracer;
-    }
+    JacksonJsonHttpMessageConverter converter = new JacksonJsonHttpMessageConverter();
+    Tracer tracer;
 
     void write(HttpServletRequest request, HttpServletResponse response, HttpStatus status) throws IOException {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, status.getReasonPhrase());

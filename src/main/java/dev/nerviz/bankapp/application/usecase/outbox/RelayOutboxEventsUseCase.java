@@ -11,8 +11,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -25,19 +27,14 @@ import org.springframework.stereotype.Service;
  * the row is sent again, and the receiver dedupes on the stable event id.
  */
 @Service
+@Slf4j
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class RelayOutboxEventsUseCase {
 
-    private static final Logger log = LoggerFactory.getLogger(RelayOutboxEventsUseCase.class);
-
-    private final OutboxRelayGateway relayGateway;
-    private final OutboxEventSender sender;
-    private final Clock clock;
-
-    public RelayOutboxEventsUseCase(OutboxRelayGateway relayGateway, OutboxEventSender sender, Clock clock) {
-        this.relayGateway = relayGateway;
-        this.sender = sender;
-        this.clock = clock;
-    }
+    OutboxRelayGateway relayGateway;
+    OutboxEventSender sender;
+    Clock clock;
 
     /** Never throws for a single row's failure: one poisoned row must not stall the batch. */
     public RelayOutcome relayPending(RelayOutboxEventsCommand command) {

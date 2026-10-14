@@ -33,7 +33,7 @@
  * before any bean exists, so a bound value would be read by nothing while the schedule fell back
  * to its default. `enabled` is not there either — `@ConditionalOnProperty` reads it itself.
  *
- * THE PASS'S INPUT. Batch size and attempt ceiling are `20-persistencia.md`'s values. This job
+ * THE PASS'S INPUT. Batch size and attempt ceiling are `20-persistence.md`'s values. This job
  * binds them (`OutboxProperties`, below) and hands them to every pass as
  * `RelayOutboxEventsCommand` — the use case's input, the role the clean-architecture convention
  * names `Command`. Built once: the record is immutable and the properties do not change at
@@ -77,6 +77,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
+import lombok.AccessLevel;
+import lombok.experimental.FieldDefaults;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -85,12 +87,13 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "app.outbox.enabled", matchIfMissing = true)
 @EnableConfigurationProperties(OutboxProperties.class)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class OutboxRelayJob {
 
-    private final RelayOutboxEvents relay;
-    private final RelayOutboxEventsCommand command;
-    private final JobRunRecorder recorder;
-    private final Counter deadLettered;
+    RelayOutboxEvents relay;
+    RelayOutboxEventsCommand command;
+    JobRunRecorder recorder;
+    Counter deadLettered;
 
     /**
      * Registers the dead-letter counter and the pending-age gauge. An event declared "must not

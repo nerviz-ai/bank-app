@@ -17,6 +17,15 @@ spring:
   application:
     name: bank-app
 
+  # The build targets JDK 21: requests, @Scheduled and listeners run on virtual threads.
+  # Virtual threads are daemons, so keep-alive holds the JVM up when only a job or a
+  # listener is working. .claude/rules/virtual-threads.md.
+  threads:
+    virtual:
+      enabled: true
+  main:
+    keep-alive: true
+
   # feature: persistence-jpa
   # The untracked `.env` at the project root: docker compose reads it for the services, and
   # this import hands the host run (the IDE, `./mvnw spring-boot:run`) the same values, so
@@ -32,7 +41,7 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME:bank_app}}
     username: ${DB_USERNAME:bank_app}
     password: ${DB_PASSWORD}
-    # UC-001 20-persistencia.md § 5 — one short insert per request; a pool bigger than
+    # UC-001 20-persistence.md § 5 — one short insert per request; a pool bigger than
     # Postgres's default max_connections share only moves the queue.
     hikari:
       maximum-pool-size: 10
@@ -72,7 +81,7 @@ spring:
         await-termination: true
         await-termination-period: PT30S
 
-  # feature: messaging — UC-004 25-mensageria.md § 5. Form B: the relay sends the JSON text the
+  # feature: messaging — UC-004 25-messaging.md § 5. Form B: the relay sends the JSON text the
   # appender stored, so both serializers only move a String. The bootstrap default is host-first
   # (./mvnw spring-boot:run); the compose `app` service overrides it with the internal listener.
   # Local broker is PLAINTEXT with no credentials; any other profile takes them from the
@@ -90,7 +99,7 @@ spring:
         # its default request.timeout.ms (30000) leaves no room under the 30000 chosen above.
         request.timeout.ms: 10000
         max.block.ms: 10000
-    # feature: messaging — UC-005 25-mensageria.md § 5, the project's first consumer. Offsets
+    # feature: messaging — UC-005 25-messaging.md § 5, the project's first consumer. Offsets
     # commit only through the manual ack, after RecordKycVerdictUseCase returns; a lost verdict
     # under earliest is reprocessed as a no-op, never silently dropped.
     consumer:
@@ -104,7 +113,7 @@ spring:
       # Overridden to false in application-test.yml: the test profile starts no broker.
       auto-startup: true
 
-  # feature: security — UC-006 32-seguranca.md § 9. Resource server, signed token. Boot builds the
+  # feature: security — UC-006 32-security.md § 9. Resource server, signed token. Boot builds the
   # decoder lazily from the issuer: the application starts without a reachable provider, and the
   # first protected call answers 401 until one exists. The default issuer is the local Keycloak
   # deferred to BL-05. No secret here: the provider's public keys are fetched, never configured.
@@ -169,13 +178,13 @@ springdoc:
 logging:
   level:
     root: INFO
-    # TRACE would log the bound security number and birth date (UC-001 20-persistencia.md § 5).
+    # TRACE would log the bound security number and birth date (UC-001 20-persistence.md § 5).
     org.hibernate.orm.jdbc.bind: WARN
 
-# feature: jobs — UC-002 20-persistencia.md § 5 (batch-size) + 35-jobs.md § 8 (the rest).
+# feature: jobs — UC-002 20-persistence.md § 5 (batch-size) + 35-jobs.md § 8 (the rest).
 # One `app.jobs` map: a job the project designs gets `app.jobs.<job-name>.*`.
 app:
-  # feature: security — UC-006 32-seguranca.md § 9. Empty allowed-origins registers no CORS mapping.
+  # feature: security — UC-006 32-security.md § 9. Empty allowed-origins registers no CORS mapping.
   security:
     api-docs-public: true
     actuator-role: OPERATOR
@@ -194,7 +203,7 @@ app:
       batch-size: 1000
       max-batches: 100
 
-  # feature: outbox — UC-004 20-persistencia.md § 1 and § 5. Values the columns encode:
+  # feature: outbox — UC-004 20-persistence.md § 1 and § 5. Values the columns encode:
   # batch / lease / attempts / backoff pace the relay's claim; prune-after is the retention
   # of published rows, whose payload carries personal data in clear (personal-data.md § At rest).
   outbox:
@@ -210,7 +219,7 @@ app:
     prune-after: P7D
     prune-batch-size: 500
 
-  # feature: messaging — UC-004 25-mensageria.md § 1, § 5 and § 9. Retention is explicit because the
+  # feature: messaging — UC-004 25-messaging.md § 1, § 5 and § 9. Retention is explicit because the
   # payload carries a national id in clear (.claude/rules/personal-data.md § In transit).
   kafka:
     topics:
@@ -218,7 +227,7 @@ app:
         partitions: 3
         replicas: ${KAFKA_TOPIC_REPLICAS:1}
         retention: P7D
-      # feature: messaging — UC-005 25-mensageria.md § 1 and § 5. No retention: no personal data
+      # feature: messaging — UC-005 25-messaging.md § 1 and § 5. No retention: no personal data
       # in the payload (.claude/rules/personal-data.md § In transit).
       kyc-verification-completed:
         partitions: 3

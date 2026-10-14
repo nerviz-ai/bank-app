@@ -3,8 +3,9 @@ package dev.nerviz.bankapp.infrastructure.scheduling.outbox;
 import dev.nerviz.bankapp.application.usecase.outbox.PruneOutboxEventsCommand;
 import dev.nerviz.bankapp.application.usecase.outbox.PruneOutboxEventsUseCase;
 import dev.nerviz.bankapp.infrastructure.scheduling.JobRunRecorder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.AccessLevel;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,13 +22,13 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "app.outbox.prune-enabled", matchIfMissing = true)
 @EnableConfigurationProperties(OutboxProperties.class)
+@Slf4j
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class OutboxPruneJob {
 
-    private static final Logger log = LoggerFactory.getLogger(OutboxPruneJob.class);
-
-    private final PruneOutboxEventsUseCase pruneOutboxEvents;
-    private final PruneOutboxEventsCommand command;
-    private final JobRunRecorder recorder;
+    PruneOutboxEventsUseCase pruneOutboxEvents;
+    PruneOutboxEventsCommand command;
+    JobRunRecorder recorder;
 
     OutboxPruneJob(PruneOutboxEventsUseCase pruneOutboxEvents, OutboxProperties properties, JobRunRecorder recorder) {
         this.pruneOutboxEvents = pruneOutboxEvents;

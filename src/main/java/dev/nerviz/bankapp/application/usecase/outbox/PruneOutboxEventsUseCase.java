@@ -3,6 +3,9 @@ package dev.nerviz.bankapp.application.usecase.outbox;
 import dev.nerviz.bankapp.application.port.OutboxRetentionGateway;
 import java.time.Clock;
 import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 
 /**
@@ -13,15 +16,12 @@ import org.springframework.stereotype.Service;
  * picks up the rest.
  */
 @Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class PruneOutboxEventsUseCase {
 
-    private final OutboxRetentionGateway retentionGateway;
-    private final Clock clock;
-
-    public PruneOutboxEventsUseCase(OutboxRetentionGateway retentionGateway, Clock clock) {
-        this.retentionGateway = retentionGateway;
-        this.clock = clock;
-    }
+    OutboxRetentionGateway retentionGateway;
+    Clock clock;
 
     /**
      * Deletes published rows older than the retention window, in bounded batches, until one

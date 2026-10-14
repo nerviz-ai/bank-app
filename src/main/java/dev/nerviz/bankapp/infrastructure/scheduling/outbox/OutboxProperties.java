@@ -12,7 +12,7 @@ import org.springframework.validation.annotation.Validated;
  * {@code prune-cron} are read by the placeholders and {@code @ConditionalOnProperty} of the
  * jobs themselves, and a second binding here would be a copy read by nothing
  * ({@code .claude/rules/scheduling.md} § Triggers). The values are the persistence design's
- * (20-persistencia.md § 1 and § 5); none has a default here, so a missing one fails the boot
+ * (20-persistence.md § 1 and § 5); none has a default here, so a missing one fails the boot
  * instead of running on a number nobody chose.
  */
 @ConfigurationProperties(prefix = "app.outbox")

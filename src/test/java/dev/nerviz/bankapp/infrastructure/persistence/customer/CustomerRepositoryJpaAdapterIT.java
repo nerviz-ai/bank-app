@@ -139,7 +139,7 @@ class CustomerRepositoryJpaAdapterIT {
         assertThat(found).isEmpty();
     }
 
-    /** {@code save} branches on an existing id — proves the update half, 20-persistencia.md § 3. */
+    /** {@code save} branches on an existing id — proves the update half, 20-persistence.md § 3. */
     @Test
     void updatesStatusOfExistingCustomer() {
         Customer customer = newCustomer("55566677788", LocalDate.of(1990, 5, 17));
@@ -154,7 +154,7 @@ class CustomerRepositoryJpaAdapterIT {
     }
 
     /**
-     * Two successive updates in the same session must both succeed. Before 20-persistencia.md
+     * Two successive updates in the same session must both succeed. Before 20-persistence.md
      * § 3, {@code save} built a fresh detached entity on every call with the primitive
      * {@code version} defaulted to {@code 0}, so the second update always false-conflicted
      * against the row's real version.

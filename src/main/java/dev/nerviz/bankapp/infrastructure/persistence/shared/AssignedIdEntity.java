@@ -4,6 +4,8 @@ import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PostLoad;
 import jakarta.persistence.PostPersist;
 import jakarta.persistence.Transient;
+import lombok.AccessLevel;
+import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Persistable;
 
 /**
@@ -12,10 +14,11 @@ import org.springframework.data.domain.Persistable;
  * § Boundary) — the one consumer the visibility default allows for.
  */
 @MappedSuperclass
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public abstract class AssignedIdEntity<T> implements Persistable<T> {
 
     @Transient
-    private boolean isNew = true;
+    boolean isNew = true;
 
     @Override
     public boolean isNew() {

@@ -17,9 +17,9 @@
  *  - the stored item's id IS the product id, so writing it again replaces it (the pgvector store
  *    upserts by id) and deleting the product deletes it by the same id. Whoever writes the product
  *    calls `ProductEmbeddings` — the use case that changes it, or a consumer of its event
- *    (`29-ia.md` § 9 hands that to `25-mensageria.md` or `35-jobs.md`);
+ *    (`29-ai.md` § 9 hands that to `25-messaging.md` or `35-jobs.md`);
  *  - only the text the search needs is embedded — name and description. The supplier's contact,
- *    the cost price and anything personal never go to the embedding provider (`29-ia.md` § 4);
+ *    the cost price and anything personal never go to the embedding provider (`29-ai.md` § 4);
  *  - a filter on metadata is built with `FilterExpressionBuilder`, never by concatenating input
  *    into a filter string;
  *  - provider failures go through the same `AiFailureTranslator` as the chat ports — the embedding
@@ -48,6 +48,8 @@ public record ProductId(UUID value) {
 package com.exemplo.minhaapi.domain.model.product;
 
 import java.util.Objects;
+import lombok.AccessLevel;
+import lombok.experimental.FieldDefaults;
 
 /** What the shopper typed. Bounded: the whole phrase is sent to the embedding provider. */
 public record SearchPhrase(String value) {
@@ -65,11 +67,12 @@ public record SearchPhrase(String value) {
 // --- Product.java (domain.model.product — the aggregate, reduced to what the search reads)
 package com.exemplo.minhaapi.domain.model.product;
 
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public final class Product {
 
-    private final ProductId id;
-    private final String name;
-    private final String description;
+    ProductId id;
+    String name;
+    String description;
 
     private Product(ProductId id, String name, String description) {
         this.id = id;
@@ -133,6 +136,8 @@ import com.openai.errors.OpenAIException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.experimental.FieldDefaults;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -140,14 +145,15 @@ import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Component;
 
 @Component
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class VectorProductSearch implements ProductSemanticSearch, ProductEmbeddings {
 
     static final String DEPENDENCY = "product-embedding-model";
     static final String PORT = "product-search";
 
-    private final VectorStore store;
-    private final AiProperties.SearchSettings settings;
-    private final AiFailureTranslator failures;
+    VectorStore store;
+    AiProperties.SearchSettings settings;
+    AiFailureTranslator failures;
 
     VectorProductSearch(VectorStore store, AiProperties properties, AiFailureTranslator failures) {
         this.store = store;

@@ -2,8 +2,10 @@ package dev.nerviz.bankapp.infrastructure.config.security;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,15 +22,12 @@ import org.springframework.security.core.Authentication;
  * name, method and path — never the token or a header. Counters carry one bounded tag each.
  */
 @Configuration(proxyBeanMethods = false)
+@Slf4j
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class SecurityAuditListener {
 
-    private static final Logger log = LoggerFactory.getLogger(SecurityAuditListener.class);
-
-    private final MeterRegistry meters;
-
-    public SecurityAuditListener(MeterRegistry meters) {
-        this.meters = meters;
-    }
+    MeterRegistry meters;
 
     @Bean
     static AuthorizationEventPublisher authorizationEventPublisher(ApplicationEventPublisher publisher) {

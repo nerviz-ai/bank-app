@@ -5,6 +5,9 @@ import java.lang.reflect.Type;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -13,13 +16,11 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Turns a {@code ResponseEntity} into a {@link StoredResponse} and back, on replay. */
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class IdempotencyResponseCodec {
 
-    private final ObjectMapper objectMapper;
-
-    IdempotencyResponseCodec(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
+    ObjectMapper objectMapper;
 
     StoredResponse encode(ResponseEntity<?> response) {
         return new StoredResponse(

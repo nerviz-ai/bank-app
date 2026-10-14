@@ -11,6 +11,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,16 +29,14 @@ import org.springframework.transaction.annotation.Transactional;
  * payload, which has personal data in clear.
  */
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class OutboxEventStore implements OutboxRelayGateway, OutboxRetentionGateway {
 
     private static final int MAX_ERROR_LENGTH = 1000;
     private static final String UNKNOWN_ERROR = "unknown";
 
-    private final OutboxEventJpaRepository repository;
-
-    OutboxEventStore(OutboxEventJpaRepository repository) {
-        this.repository = repository;
-    }
+    OutboxEventJpaRepository repository;
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)

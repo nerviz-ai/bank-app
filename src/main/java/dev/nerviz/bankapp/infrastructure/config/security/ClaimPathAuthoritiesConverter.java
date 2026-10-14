@@ -9,6 +9,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -20,13 +23,11 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * a space-separated string, yields no authority — never an error: a token without roles is a
  * caller without roles.
  */
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public final class ClaimPathAuthoritiesConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 
-    private final TokenAuthoritiesProperties properties;
-
-    public ClaimPathAuthoritiesConverter(TokenAuthoritiesProperties properties) {
-        this.properties = properties;
-    }
+    TokenAuthoritiesProperties properties;
 
     @Override
     public Collection<GrantedAuthority> convert(Jwt jwt) {

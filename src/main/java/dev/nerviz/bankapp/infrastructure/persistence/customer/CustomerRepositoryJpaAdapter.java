@@ -8,6 +8,9 @@ import dev.nerviz.bankapp.domain.model.CustomerId;
 import dev.nerviz.bankapp.domain.model.CustomerIdentity;
 import dev.nerviz.bankapp.domain.model.SecurityNumber;
 import java.util.Optional;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -18,15 +21,13 @@ import org.springframework.stereotype.Component;
  * ({@.claude/rules/persistence.md} § Boundary).
  */
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class CustomerRepositoryJpaAdapter implements CustomerRepository {
 
     private static final String SECURITY_NUMBER_CONSTRAINT = "uq_customers_security_number";
 
-    private final CustomerJpaRepository repository;
-
-    CustomerRepositoryJpaAdapter(CustomerJpaRepository repository) {
-        this.repository = repository;
-    }
+    CustomerJpaRepository repository;
 
     @Override
     public boolean existsBySecurityNumber(SecurityNumber securityNumber) {

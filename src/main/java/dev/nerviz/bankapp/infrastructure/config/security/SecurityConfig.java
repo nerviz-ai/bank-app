@@ -1,6 +1,9 @@
 package dev.nerviz.bankapp.infrastructure.config.security;
 
 import java.util.List;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
@@ -23,26 +26,17 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(SecurityAccessProperties.class)
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class SecurityConfig {
 
     private static final String[] API_DOCS = {"/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html"};
     private static final String CUSTOMERS = "/api/*/customers";
 
-    private final AuthenticationMechanism mechanism;
-    private final ProblemDetailAuthenticationEntryPoint entryPoint;
-    private final ProblemDetailAccessDeniedHandler accessDeniedHandler;
-    private final SecurityAccessProperties access;
-
-    public SecurityConfig(
-            AuthenticationMechanism mechanism,
-            ProblemDetailAuthenticationEntryPoint entryPoint,
-            ProblemDetailAccessDeniedHandler accessDeniedHandler,
-            SecurityAccessProperties access) {
-        this.mechanism = mechanism;
-        this.entryPoint = entryPoint;
-        this.accessDeniedHandler = accessDeniedHandler;
-        this.access = access;
-    }
+    AuthenticationMechanism mechanism;
+    ProblemDetailAuthenticationEntryPoint entryPoint;
+    ProblemDetailAccessDeniedHandler accessDeniedHandler;
+    SecurityAccessProperties access;
 
     @Bean
     SecurityFilterChain apiSecurityFilterChain(HttpSecurity http) {
@@ -60,7 +54,7 @@ public class SecurityConfig {
     /**
      * Specific to general, every path naming all API versions of its route
      * ({@.claude/rules/authorization.md} § Default access). {@code POST /api/*}{@code /customers}
-     * is public by UC-001's decision, kept in UC-006 ({@code 32-seguranca.md} § 1).
+     * is public by UC-001's decision, kept in UC-006 ({@code 32-security.md} § 1).
      */
     private void requestRules(
             AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry requests) {

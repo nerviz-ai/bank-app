@@ -3,6 +3,9 @@ package dev.nerviz.bankapp.application.usecase.idempotency;
 import dev.nerviz.bankapp.application.port.IdempotencyKeyPort;
 import java.time.Clock;
 import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 
 /**
@@ -17,15 +20,12 @@ import org.springframework.stereotype.Service;
  * port call, not the use case method).
  */
 @Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class PruneExpiredIdempotencyKeysUseCase {
 
-    private final IdempotencyKeyPort idempotencyKeyPort;
-    private final Clock clock;
-
-    public PruneExpiredIdempotencyKeysUseCase(IdempotencyKeyPort idempotencyKeyPort, Clock clock) {
-        this.idempotencyKeyPort = idempotencyKeyPort;
-        this.clock = clock;
-    }
+    IdempotencyKeyPort idempotencyKeyPort;
+    Clock clock;
 
     /**
      * Deletes every {@code idempotency_keys} row expired before this call started, in bounded

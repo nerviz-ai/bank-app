@@ -9,7 +9,10 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.time.Clock;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import lombok.experimental.FieldDefaults;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -26,25 +29,16 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  */
 @Aspect
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class IdempotencyAspect {
 
     private static final String CALLER_PLACEHOLDER = "anonymous";
 
-    private final IdempotentExecution idempotentExecution;
-    private final IdempotencyRequestHasher requestHasher;
-    private final IdempotencyResponseCodec responseCodec;
-    private final Clock clock;
-
-    IdempotencyAspect(
-            IdempotentExecution idempotentExecution,
-            IdempotencyRequestHasher requestHasher,
-            IdempotencyResponseCodec responseCodec,
-            Clock clock) {
-        this.idempotentExecution = idempotentExecution;
-        this.requestHasher = requestHasher;
-        this.responseCodec = responseCodec;
-        this.clock = clock;
-    }
+    IdempotentExecution idempotentExecution;
+    IdempotencyRequestHasher requestHasher;
+    IdempotencyResponseCodec responseCodec;
+    Clock clock;
 
     /**
      * No {@code throws Throwable} here: {@code proceedUnchecked} below crosses that

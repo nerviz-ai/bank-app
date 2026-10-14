@@ -5,6 +5,9 @@ import dev.nerviz.bankapp.domain.exception.ConflictException;
 import dev.nerviz.bankapp.domain.exception.CustomerNotFoundException;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,13 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
  * verdict already applied writes nothing.
  */
 @Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class RecordKycVerdictUseCase {
 
-    private final CustomerRepository customerRepository;
-
-    public RecordKycVerdictUseCase(CustomerRepository customerRepository) {
-        this.customerRepository = customerRepository;
-    }
+    CustomerRepository customerRepository;
 
     /**
      * @throws CustomerNotFoundException {@code CUSTOMER_NOT_FOUND} — no customer has this id

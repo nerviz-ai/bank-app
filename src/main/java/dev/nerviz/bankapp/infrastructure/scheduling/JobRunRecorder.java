@@ -7,6 +7,9 @@ import java.time.Clock;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Component;
 
 /**
@@ -19,18 +22,15 @@ import org.springframework.stereotype.Component;
  * staleness is the only signal, and only if something measures it.
  */
 @Component
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class JobRunRecorder {
 
     private static final double MILLIS_PER_SECOND = 1000d;
 
-    private final MeterRegistry meters;
-    private final Clock clock;
-    private final Map<String, AtomicLong> lastSuccess = new ConcurrentHashMap<>();
-
-    public JobRunRecorder(MeterRegistry meters, Clock clock) {
-        this.meters = meters;
-        this.clock = clock;
-    }
+    MeterRegistry meters;
+    Clock clock;
+    Map<String, AtomicLong> lastSuccess = new ConcurrentHashMap<>();
 
     /**
      * Runs one pass and records it. A failure still escapes to the scheduler's error handler,

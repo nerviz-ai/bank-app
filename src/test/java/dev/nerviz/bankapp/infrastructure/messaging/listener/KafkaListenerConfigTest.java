@@ -21,7 +21,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The classifier is plain code; cheaper than forcing a lock failure through a broker
- * ({@code 40-testes.md} § 1). {@code handleOne} returning {@code true} means the error handler
+ * ({@code 40-tests.md} § 1). {@code handleOne} returning {@code true} means the error handler
  * recovered (dead-lettered) on the first failure, with no retry; {@code false} means the normal
  * backoff still has attempts left.
  */

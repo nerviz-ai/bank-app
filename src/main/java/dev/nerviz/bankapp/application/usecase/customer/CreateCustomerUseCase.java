@@ -9,6 +9,9 @@ import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
 import dev.nerviz.bankapp.domain.model.SecurityNumber;
 import java.time.Clock;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,18 +21,13 @@ import org.springframework.transaction.annotation.Transactional;
  * and closes here ({@.claude/rules/architecture-ddd.md} § Application).
  */
 @Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class CreateCustomerUseCase {
 
-    private final CustomerRepository customerRepository;
-    private final RequestKycVerification requestKycVerification;
-    private final Clock clock;
-
-    public CreateCustomerUseCase(
-            CustomerRepository customerRepository, RequestKycVerification requestKycVerification, Clock clock) {
-        this.customerRepository = customerRepository;
-        this.requestKycVerification = requestKycVerification;
-        this.clock = clock;
-    }
+    CustomerRepository customerRepository;
+    RequestKycVerification requestKycVerification;
+    Clock clock;
 
     /**
      * @throws dev.nerviz.bankapp.domain.exception.ValidationException malformed input

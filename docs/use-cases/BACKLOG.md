@@ -8,8 +8,8 @@ are fixed only when the case is designed.
 
 | Id | Depends on | Description for `/new-feature` | Split from |
 |---|---|---|---|
-| `BL-04` | `UC-004-initiate-kyc-verification` | REST endpoint or operator command that resets a dead-lettered row of the shared `outbox_events` table to pending (attempts 0, `dead_lettered` false), so the relay re-sends it. Unknown event id is not found; a row that is not dead-lettered is a conflict | `UC-004-initiate-kyc-verification` — deferred by `25-mensageria.md` § 9 |
-| `BL-05` | `UC-006-anonymize-customer` | Local Keycloak service in `docker-compose.yml` for development: realm `bank`, a client whose tokens carry audience `bank-app` and a flat top-level `roles` claim, test users holding `DATA_PROTECTION_OFFICER` and `OPERATOR`, reachable at `http://localhost:8180/realms/bank` (the default of `OAUTH2_ISSUER_URI`). Owner of the service block: `docker-architect`. Until it exists, a local run answers 401 on every protected call | `UC-006-anonymize-customer` — deferred by `32-seguranca.md` § 11 |
+| `BL-04` | `UC-004-initiate-kyc-verification` | REST endpoint or operator command that resets a dead-lettered row of the shared `outbox_events` table to pending (attempts 0, `dead_lettered` false), so the relay re-sends it. Unknown event id is not found; a row that is not dead-lettered is a conflict | `UC-004-initiate-kyc-verification` — deferred by `25-messaging.md` § 9 |
+| `BL-05` | `UC-006-anonymize-customer` | Local Keycloak service in `docker-compose.yml` for development: realm `bank`, a client whose tokens carry audience `bank-app` and a flat top-level `roles` claim, test users holding `DATA_PROTECTION_OFFICER` and `OPERATOR`, reachable at `http://localhost:8180/realms/bank` (the default of `OAUTH2_ISSUER_URI`). Owner of the service block: `docker-architect`. Until it exists, a local run answers 401 on every protected call | `UC-006-anonymize-customer` — deferred by `32-security.md` § 11 |
 
 ## Retired
 

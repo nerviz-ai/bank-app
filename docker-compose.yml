@@ -79,7 +79,7 @@ services:
       retries: 30
       start_period: 60s
 
-  # UC-004 / UC-005 (25-mensageria.md) — single-node KRaft broker. Tag matched to the one
+  # UC-004 / UC-005 (25-messaging.md) — single-node KRaft broker. Tag matched to the one
   # pinned in KafkaContainerConfiguration.java. Two listeners, one per network: PLAINTEXT
   # (kafka:9092) for the compose network, EXTERNAL (localhost:${KAFKA_EXTERNAL_PORT:-29092})
   # for the host run — application.yml's bootstrap-servers default reads the same variable.
@@ -108,7 +108,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # UC-006 (32-seguranca.md § 11, BL-05) — local identity provider for ./mvnw spring-boot:run.
+  # UC-006 (32-security.md § 11, BL-05) — local identity provider for ./mvnw spring-boot:run.
   # Imports realm `bank` (audience `bank-app`, flat `roles` claim, users `dpo` and `operator`)
   # at start. The token's `iss` follows the host the client used to fetch it:
   # http://localhost:${KEYCLOAK_PORT:-8180}/realms/bank from the host (application.yml's

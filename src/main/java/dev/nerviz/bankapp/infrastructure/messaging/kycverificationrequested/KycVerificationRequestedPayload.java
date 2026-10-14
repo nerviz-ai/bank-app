@@ -8,7 +8,7 @@ import java.time.LocalDate;
 /**
  * The wire shape the KYC application receives, mapped explicitly from the domain event — the
  * event itself never serializes. {@code securityNumber}, {@code birthDate} and {@code name}
- * cross in full: the receiver verifies exactly those values (25-mensageria.md § 8,
+ * cross in full: the receiver verifies exactly those values (25-messaging.md § 8,
  * {@code .claude/rules/personal-data.md} § Admitted exception). {@code toString()} masks the
  * first two, for log lines only.
  */

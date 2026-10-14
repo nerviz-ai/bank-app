@@ -174,7 +174,7 @@ class IdempotencyKeyStoreIT {
      * A second thread holds {@code SELECT ... FOR UPDATE} on one expired row, inside its own
      * open transaction, while the test thread calls {@code deleteExpired}. Both latches are
      * bounded: a regression to a blocking {@code FOR UPDATE} fails the assertion instead of
-     * hanging the build ({@code 40-testes.md} § 2).
+     * hanging the build ({@code 40-tests.md} § 2).
      */
     @Test
     void deleteExpiredSkipsRowLockedByAnotherTransaction() throws InterruptedException {

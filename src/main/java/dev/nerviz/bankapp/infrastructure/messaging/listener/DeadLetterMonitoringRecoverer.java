@@ -3,9 +3,11 @@ package dev.nerviz.bankapp.infrastructure.messaging.listener;
 import dev.nerviz.bankapp.domain.exception.DomainException;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Map;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.support.serializer.DeserializationException;
 import org.springframework.messaging.converter.MessageConversionException;
@@ -15,27 +17,22 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Wraps the {@link org.springframework.kafka.listener.DeadLetterPublishingRecoverer}: logs one
  * {@code WARN} line and increments the dead-letter counter before delegating the actual publish
- * (25-mensageria.md § 4, {@code .claude/rules/observability.md} § Metrics — "a delivery the
+ * (25-messaging.md § 4, {@code .claude/rules/observability.md} § Metrics — "a delivery the
  * design declared must not be lost carries two metrics"; here the give-up path itself).
  */
+@Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class DeadLetterMonitoringRecoverer implements ConsumerRecordRecoverer {
 
-    private static final Logger log = LoggerFactory.getLogger(DeadLetterMonitoringRecoverer.class);
     private static final String UNKNOWN = "unknown";
     private static final String MALFORMED_REASON = "MALFORMED";
     private static final String TRANSIENT_EXHAUSTED_REASON = "TRANSIENT_EXHAUSTED";
     private static final String METRIC_NAME = "kyc.verdict.dead.lettered";
 
-    private final ConsumerRecordRecoverer delegate;
-    private final MeterRegistry meterRegistry;
-    private final JsonMapper jsonMapper;
-
-    DeadLetterMonitoringRecoverer(
-            ConsumerRecordRecoverer delegate, MeterRegistry meterRegistry, JsonMapper jsonMapper) {
-        this.delegate = delegate;
-        this.meterRegistry = meterRegistry;
-        this.jsonMapper = jsonMapper;
-    }
+    ConsumerRecordRecoverer delegate;
+    MeterRegistry meterRegistry;
+    JsonMapper jsonMapper;
 
     @Override
     public void accept(ConsumerRecord<?, ?> consumerRecord, Exception exception) {
@@ -59,6 +56,12 @@ class DeadLetterMonitoringRecoverer implements ConsumerRecordRecoverer {
             Object eventId = payload.get("eventId");
             return eventId == null ? UNKNOWN : eventId.toString();
         } catch (JacksonException ex) {
+            log.warn(
+                    "Dead-lettered record payload unreadable, eventId logged as unknown: topic={} partition={} offset={} errorCode={}",
+                    consumerRecord.topic(),
+                    consumerRecord.partition(),
+                    consumerRecord.offset(),
+                    MALFORMED_REASON);
             return UNKNOWN;
         }
     }

@@ -25,7 +25,7 @@ import tools.jackson.databind.json.JsonMapper;
  * classifier matches by exact Java type, and {@code error-handling.md} forbids a second
  * {@code RuntimeException} root to carry a different classification for the same type. That one
  * errorCode retries in-process, inside the listener that already knows it
- * (25-mensageria.md § 4, {@code KycVerificationCompletedListener}). Conversion failures
+ * (25-messaging.md § 4, {@code KycVerificationCompletedListener}). Conversion failures
  * (malformed JSON) are already in {@link DefaultErrorHandler}'s own fatal-exception default —
  * nothing to add here for them.
  */

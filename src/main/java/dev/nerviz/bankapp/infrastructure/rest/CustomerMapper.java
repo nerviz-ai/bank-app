@@ -9,7 +9,6 @@ import dev.nerviz.bankapp.domain.model.CustomerIdentity;
 import dev.nerviz.bankapp.infrastructure.rest.dto.CreateCustomerRequest;
 import dev.nerviz.bankapp.infrastructure.rest.dto.CustomerDetailsResponse;
 import dev.nerviz.bankapp.infrastructure.rest.dto.CustomerResponse;
-import java.time.LocalDate;
 import java.util.UUID;
 
 /** Manual translation. No domain type in the controller's public signature. */
@@ -35,23 +34,23 @@ final class CustomerMapper {
 
     /** {@code Anonymized} leaves both values {@code null}; {@code NON_NULL} drops them from the body. */
     static CustomerDetailsResponse toDetailsResponse(Customer customer) {
-        String securityNumber = null;
-        LocalDate birthDate = null;
-        switch (customer.identity()) {
-            case CustomerIdentity.Identified identified -> {
-                securityNumber = identified.securityNumber().value();
-                birthDate = identified.birthDate();
-            }
-            case CustomerIdentity.Anonymized ignored -> {
-                // both stay null
-            }
-        }
-        return new CustomerDetailsResponse(
-                customer.id().value(),
-                customer.name(),
-                securityNumber,
-                birthDate,
-                customer.registeredAt(),
-                customer.status().name());
+        return switch (customer.identity()) {
+            case CustomerIdentity.Identified identified ->
+                new CustomerDetailsResponse(
+                        customer.id().value(),
+                        customer.name(),
+                        identified.securityNumber().value(),
+                        identified.birthDate(),
+                        customer.registeredAt(),
+                        customer.status().name());
+            case CustomerIdentity.Anonymized ignored ->
+                new CustomerDetailsResponse(
+                        customer.id().value(),
+                        customer.name(),
+                        null,
+                        null,
+                        customer.registeredAt(),
+                        customer.status().name());
+        };
     }
 }

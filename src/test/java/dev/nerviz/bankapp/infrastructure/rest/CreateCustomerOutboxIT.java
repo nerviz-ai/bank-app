@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.DockerClientFactory;
 
 /**
- * Invariant 4 of {@code 10-dominio.md}: one request per committed creation, none otherwise.
+ * Invariant 4 of {@code 10-domain.md}: one request per committed creation, none otherwise.
  * Only the real transaction across {@code customers} and {@code outbox_events} can prove it —
  * a use case test with the port doubled cannot see the rollback.
  */

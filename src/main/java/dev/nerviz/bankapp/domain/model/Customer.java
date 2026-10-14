@@ -84,7 +84,7 @@ public record Customer(
             throw new ValidationException("KYC_VERDICT_REQUIRED", "kyc verdict is required");
         }
         CustomerStatus target = verdict.resultingStatus();
-        if (status == CustomerStatus.KYC_IN_PROGRESS) {
+        if (!status.isFinal()) {
             return new Customer(id, name, identity, registeredAt, target);
         }
         if (status == target) {
@@ -106,7 +106,7 @@ public record Customer(
         if (isAnonymized()) {
             return this;
         }
-        if (status == CustomerStatus.KYC_IN_PROGRESS) {
+        if (!status.isFinal()) {
             throw new BusinessRuleViolationException(
                     "CUSTOMER_KYC_IN_PROGRESS", "customer cannot be anonymized while KYC is in progress");
         }

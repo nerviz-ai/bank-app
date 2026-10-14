@@ -4,6 +4,9 @@ import dev.nerviz.bankapp.application.port.RequestKycVerification;
 import dev.nerviz.bankapp.domain.event.KycVerificationRequested;
 import dev.nerviz.bankapp.infrastructure.messaging.outbox.OutboxAppender;
 import dev.nerviz.bankapp.infrastructure.messaging.outbox.TopicResolver;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,13 +15,11 @@ import org.springframework.stereotype.Component;
  * commit and publish that Form B closes.
  */
 @Component
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class RequestKycVerificationOutboxAdapter implements RequestKycVerification {
 
-    private final OutboxAppender outbox;
-
-    RequestKycVerificationOutboxAdapter(OutboxAppender outbox) {
-        this.outbox = outbox;
-    }
+    OutboxAppender outbox;
 
     @Override
     public void request(KycVerificationRequested event) {

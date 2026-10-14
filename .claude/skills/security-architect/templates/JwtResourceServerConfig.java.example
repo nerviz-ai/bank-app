@@ -1,14 +1,14 @@
 /*
  * EXEMPLAR — mechanism "resource server, signed token": the caller sends
  * `Authorization: Bearer <JWT>` issued by an external identity provider, and this application
- * validates it locally against the provider's key set. `32-seguranca.md` § 2 and § 3.
+ * validates it locally against the provider's key set. `32-security.md` § 2 and § 3.
  *
  * WHAT BOOT ALREADY DOES, AND WHY THERE IS NO DECODER BEAN HERE: with
  * `spring.security.oauth2.resourceserver.jwt.issuer-uri` set, Boot builds the decoder,
  * discovers the key set, and validates signature, expiry, not-before and issuer; with
  * `...jwt.audiences` it adds the audience check `.claude/rules/authorization.md` § Mechanism
  * requires. A `JwtDecoder` bean of our own replaces Boot's — and the audience check goes with
- * it, in silence. Declare one only when `32-seguranca.md` says why, and then add a
+ * it, in silence. Declare one only when `32-security.md` says why, and then add a
  * `JwtAudienceValidator` to it by hand.
  *
  * WHAT THIS CLASS ADDS: the claims-to-authorities mapping, which providers place in different,
@@ -93,6 +93,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -103,13 +106,11 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * absent, or holds something that is neither a list nor a space-separated string, yields no
  * authority — never an error: a token without groups is a caller without groups.
  */
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public final class ClaimPathAuthoritiesConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 
-    private final TokenAuthoritiesProperties properties;
-
-    public ClaimPathAuthoritiesConverter(TokenAuthoritiesProperties properties) {
-        this.properties = properties;
-    }
+    TokenAuthoritiesProperties properties;
 
     @Override
     public Collection<GrantedAuthority> convert(Jwt jwt) {

@@ -9,8 +9,9 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.AccessLevel;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,14 +30,14 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "app.outbox.enabled", matchIfMissing = true)
 @EnableConfigurationProperties(OutboxProperties.class)
+@Slf4j
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class OutboxRelayJob {
 
-    private static final Logger log = LoggerFactory.getLogger(OutboxRelayJob.class);
-
-    private final RelayOutboxEventsUseCase relayOutboxEvents;
-    private final RelayOutboxEventsCommand command;
-    private final JobRunRecorder recorder;
-    private final Counter deadLettered;
+    RelayOutboxEventsUseCase relayOutboxEvents;
+    RelayOutboxEventsCommand command;
+    JobRunRecorder recorder;
+    Counter deadLettered;
 
     OutboxRelayJob(
             RelayOutboxEventsUseCase relayOutboxEvents,

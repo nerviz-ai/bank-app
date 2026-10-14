@@ -157,7 +157,7 @@ generated it:
 - `arch-doctor` — diagnoses the AI setup and architecture enforcement on this machine
 - `audit-usage` — reads the `.claude/audit-usage/` trail and reports spend, duration and failures per skill/agent run
 - `docker-architect` — single owner of every `docker-compose.yml`/`Dockerfile` service block added after generation
-- `domain-modeling` — details a use case's domain and application layer (aggregate, ports, events) into `10-dominio.md`
+- `domain-modeling` — details a use case's domain and application layer (aggregate, ports, events) into `10-domain.md`
 - `git-publish` — offers to git init/commit and create+push a GitHub repo, behind two confirmations
 - `gof-design-patterns` — chooses and implements a design pattern from the symptom that justifies it
 - `http-client-architect` — designs the outbound HTTP adapter of an already-modeled use case
