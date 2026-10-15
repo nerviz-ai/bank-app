@@ -30,7 +30,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class SecurityConfig {
 
-    private static final String[] API_DOCS = {"/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html"};
+    private static final String[] API_DOCS = {
+        "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/springwolf/docs/**"
+    };
     private static final String CUSTOMERS = "/api/*/customers";
 
     AuthenticationMechanism mechanism;

@@ -5,6 +5,10 @@ import dev.nerviz.bankapp.application.usecase.customer.RecordKycVerdictUseCase;
 import dev.nerviz.bankapp.commons.logging.annotations.LogExecution;
 import dev.nerviz.bankapp.domain.exception.ValidationException;
 import dev.nerviz.bankapp.domain.model.KycVerdict;
+import io.github.springwolf.bindings.kafka.annotations.KafkaAsyncOperationBinding;
+import io.github.springwolf.core.asyncapi.annotations.AsyncListener;
+import io.github.springwolf.core.asyncapi.annotations.AsyncMessage;
+import io.github.springwolf.core.asyncapi.annotations.AsyncOperation;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -28,10 +32,26 @@ import org.springframework.stereotype.Component;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 class KycVerificationCompletedListener {
 
+    private static final String GROUP_ID = "bank-app.kyc-verdict";
+
     RecordKycVerdictUseCase recordKycVerdict;
 
     @LogExecution
-    @KafkaListener(topics = KycVerificationCompletedTopicConfig.TOPIC, groupId = "bank-app.kyc-verdict")
+    @KafkaListener(topics = KycVerificationCompletedTopicConfig.TOPIC, groupId = GROUP_ID)
+    @AsyncListener(
+            operation =
+                    @AsyncOperation(
+                            channelName = KycVerificationCompletedTopicConfig.TOPIC,
+                            description = "Receives the KYC application's verdict (APPROVED or REJECT) for a"
+                                    + " customer and records it on the customer; idempotent. Unknown verdicts and"
+                                    + " conflicts go to <topic>.dlq.",
+                            payloadType = KycVerificationCompletedPayload.class,
+                            message =
+                                    @AsyncMessage(
+                                            messageId = "KycVerificationCompleted",
+                                            name = "KycVerificationCompleted"),
+                            headers = @AsyncOperation.Headers(notUsed = true)))
+    @KafkaAsyncOperationBinding(groupId = GROUP_ID)
     void onMessage(KycVerificationCompletedPayload payload) {
         KycVerdict verdict = mapVerdict(payload.verdict());
         recordKycVerdict.recordVerdict(new RecordKycVerdictCommand(payload.customerId(), verdict));

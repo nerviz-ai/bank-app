@@ -167,6 +167,25 @@ management:
       export:
         url: ${OTLP_METRICS_ENDPOINT:http://localhost:4318/v1/metrics}
 
+# feature: asyncapi — .claude/rules/messaging.md § Contract documentation. Springwolf builds the
+# document at run time from the annotations on the producers and listeners.
+# `kafka-listener.enabled: false`: its own @KafkaListener scan documents a header this wire never
+# carries and lists the method twice beside @AsyncListener. No `servers`, no `info.version`: both
+# would change the committed snapshot between environments or releases.
+springwolf:
+  docket:
+    base-package: dev.nerviz.bankapp.infrastructure.messaging.kycverificationrequested,dev.nerviz.bankapp.infrastructure.messaging.kycverificationcompleted
+    info:
+      title: ${spring.application.name}
+  use-fqn: false
+  plugin:
+    kafka:
+      scanner:
+        kafka-listener:
+          enabled: false
+      publishing:
+        enabled: false
+
 # feature: openapi
 springdoc:
   swagger-ui:

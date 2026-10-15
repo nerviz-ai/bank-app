@@ -230,7 +230,7 @@
       "max-5x": {"label": "Max 5x", "multipliers": {"five_hour": 5, "weekly": null}},
       "max-20x": {"label": "Max 20x", "multipliers": {"five_hour": 20, "weekly": null}}
     },
-    "$comment_genesis": "Read by `audit genesis <project> <session-id>`, which `/init-project` runs after `project-initializer` returns and before `git-publish`. `file` is the generated project's genesis record, relative to its root; `command` the skill whose `<command-name>` message marks Started in this session's transcript; `placeholders` the three literals step 8.6 of project-bootstrap leaves in the file and this mode replaces — Started, Finished (the moment it runs), and the tokens of the main transcript and every subagent transcript from Started on — no cost, the trail prices nothing (0134). The model never writes those three values. ",
+    "$comment_genesis": "Read by `audit genesis <project> <session-id>`, which `/init-project` runs after `project-initializer` returns and before `git-publish`. `file` is the generated project's genesis record, relative to its root; `command` the skill whose entry marks Started in this session's transcript — a `<command-name>` message when it was typed, or the prompt behind a Skill tool result whose `toolUseResult.commandName` names it (0164); `placeholders` the three literals step 8.6 of project-bootstrap leaves in the file and this mode replaces — Started, Finished (the moment it runs), and the tokens of the main transcript and every subagent transcript from Started on — no cost, the trail prices nothing (0134). The model never writes those three values. , Started anchors amended by a decision recorded in the meta-repository",
     "genesis": {
       "file": ".claude/audit-usage/GENESIS.md",
       "command": "init-project",
@@ -324,7 +324,7 @@
         "$comment": "Writes the extensions themselves. The only class whose territory is .claude/ — and the reason the guard is registered in this meta-repository at all. `docs/**` and `.github/**` are in the list because they are DERIVED from the extensions: a change to a hook mode or a class rewrites docs/pt-br/08-audit-usage.md and its English twin, and a new enforcement adds a step to the workflow that runs it. Leaving them out would block the propagation step of the very skill this class holds, which is what the first run of this block did.",
         "allowed_models": ["opus"],
         "write_allow": [
-          ".claude/**", "CLAUDE.md", ".mcp.json", "MCP-SETUP.md",
+          ".claude/**", "CLAUDE.md", "README.md", ".mcp.json", "MCP-SETUP.md",
           "docs/**", ".github/**"
         ],
         "required_sections": ["## Procedure", "## Out of scope"],
@@ -336,7 +336,7 @@
         "allowed_models": ["sonnet"],
         "write_allow": [],
         "required_sections": ["## Procedure", "## Failure modes"],
-        "skills": ["git-publish", "triage-issue"]
+        "skills": ["git-publish", "triage-issue", "new-project"]
       },
       "report": {
         "$comment": "Runs an analyzer over the project, writes one findings file under docs/lessons-learned/, and — behind a confirmation — publishes a sanitized copy outside the working tree. Not `build`, whose reason to exist is materializing files outside docs/, and not `ops`, which writes no file and allows sonnet only while this class's tracing step is judgment. `## Failure modes` is required because every run depends on two external systems — the analyzer's server and the forge the issue goes to — and each one fails in a way the reader must be told how to leave. Blocked during design: a run is a full build. The territory is the class default on purpose, so a second report skill joins by name, with no override. Design: `report-issue` is that second skill: the one door from a generated project to the meta-repository, so sonar-lessons now writes its findings file and prints the command instead of publishing — one owner of the privacy rule and the duplicate search. ",
@@ -558,7 +558,9 @@
     "auth_env": "GH_TOKEN",
     "auth_header": "Authorization: Bearer",
     "default_ref": "latest-tag",
-    "stamp_file": ".claude/.arch-provenance.json"
+    "stamp_file": ".claude/.arch-provenance.json",
+    "$comment_fetch_marker": "Written by `new-project` into the tree it extracts from `base_url` — `{\"ref\": …, \"commit\": …}`, what `git ls-remote` resolved — because a tarball carries no repository. Read by `export` only when the source root is not the top of its own work tree, and only for the field the command line left out, so a project generated from a fetched tree is stamped with a real tag and commit instead of `working-tree`/`unknown`. Never copied into a project: `export` writes only what its own block lists. ",
+    "fetch_marker": ".claude/.fetched-source.json"
   },
 
   "migrations": {
@@ -791,6 +793,12 @@
         "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "modular-monolith", "layered", "vertical-slice", "onion"],
         "note": "Mappers now have one mechanism per project, recorded in a `**Mappers:` paragraph of the root CLAUDE.md (.claude/rules/mapping.md): manual — the default and what every project generated before this has — or MapStruct. The next /new-feature-implement asks once and records the answer; choosing MapStruct wires the build (Lombok, its MapStruct binding and every other processor on the annotation processor path, the three processor options) and converts every existing manual mapper and its callers in one change, from a clean source tree. The domain module, and the application module where the blueprint has one, now forbid `org.mapstruct..` (hexagonal, clean-architecture-multi-module, onion). `.claude/forbidden-imports.txt` and each module AGENTS.md are written once, so a project generated before this does not refuse the new import. Nothing breaks if they stay.",
         "prompt": "Bring this project's boundary map up to the active blueprint's MapStruct rule. Read the active blueprint's YAML — the one whose id .claude/.arch-provenance.json names, which the export keeps in this project — and the generation rule in Nerviz's project-bootstrap references/project-files.md § 5 — never from memory: if /arch-adopt just ran it is under $SRC/.claude/skills/project-bootstrap/references/ (SRC defaults to /tmp/arch-src); otherwise download the tarball named by `source.base_url` in .claude/schemas/extensions.json, with {ref} set to the `ref` of .claude/.arch-provenance.json. (1) If the blueprint gives the domain its own module, add to .claude/forbidden-imports.txt every `<module-path>|<prefix>` line that rule derives and the file does not hold yet — `domain|org.mapstruct.`, and `application|org.mapstruct.` for a layout with an application module, with each module's real path — and the same prefix to those modules' AGENTS.md, in their list format. Never remove a line. If the blueprint has no domain module, say so and change nothing. (2) Do not add MapStruct here and do not write a `**Mappers:` paragraph: the next /new-feature-implement asks which mechanism this project uses. Finish with `java .claude/hooks/ArchHook.java doctor` and show me its `Boundaries`, `Boundary violations` and `Agent instructions` lines."
+      },
+      {
+        "id": "asyncapi-springwolf",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "modular-monolith", "layered", "vertical-slice", "onion"],
+        "note": "The asynchronous contract is now a document: .claude/rules/messaging.md § Contract documentation has Springwolf generate an AsyncAPI document from annotations on every producer and listener, served at /springwolf/docs and compared with a snapshot committed at src/test/asyncapi/ by an integration test that runs in verify. Projects generated before this change publish and consume Kafka events with nothing for an outside consumer to read and nothing that notices the code drifting from the design. Only matters if the project uses Kafka. Nothing changes on the wire or in behavior: the annotations are read at startup and the test is new. Springwolf's core brings Jackson 2 for its own document; the application's JsonMapper stays the Jackson 3 one. The generated operation ids are <topic>_send_<method> and <topic>_receive_<method>, so a later rename of a port or listener method shows up in the snapshot diff.",
+        "prompt": "Bring this project's Kafka messaging to the AsyncAPI contract of .claude/rules/messaging.md § Contract documentation, using .claude/skills/messaging-architect/templates/ as the shape. First check whether it applies: if no class in src/main uses KafkaTemplate or @KafkaListener, tell me so and stop; if the build already declares io.github.springwolf:springwolf-kafka, tell me so and stop. Then list, with file and line, and change nothing yet: (1) every class that sends to Kafka, or under an outbox writes the row of an event, with its topic and the port method that calls it; (2) every @KafkaListener method with its topic, group id and payload type; (3) the headers any of them reads or sets by hand; (4) whether a SecurityConfig lists the OpenAPI paths. Propose for each operation a one-sentence description a consumer can act on (for a producer, naming the partition key), and wait for my go-ahead. After I confirm: add io.github.springwolf:springwolf-kafka to the build with the latest stable 2.x number (no -RC or -M suffix) read from https://repo1.maven.org/maven2/io/github/springwolf/springwolf-kafka/maven-metadata.xml, never its <release> element, no other dependency; merge the springwolf block of application-kafka.yml.example into application.yml with base-package set to the messaging adapter packages, never a second spring: root; put @AsyncPublisher on the publisher's method that implements the outbound port (under an outbox, on the writer's, never on the class that sends the relay's rows), and @AsyncListener plus @KafkaAsyncOperationBinding(groupId = ...) on each listener method, making the topic one static final String per flow shared by the send, @KafkaListener and channelName, and the publisher or writer a @Component; if SecurityConfig exists, add /springwolf/docs/** to the same list as the OpenAPI paths. Then add AsyncApiContractIT from .claude/skills/test-architect/templates/AsyncApiContractIT.java.example, run it once, copy target/asyncapi/asyncapi.current.json to src/test/asyncapi/asyncapi.snapshot.json after reading it against the list above, and run ./mvnw verify. Change no behavior and no topic name."
       }
     ]
   },
@@ -841,6 +849,14 @@
     "process_allow": ["java"],
     "$comment_markers": "Fragments of the refusals `guard write` and `guard bash` print. `guard status` hands them to the cockpit mod, which holds a Bash refusal behind its dialog only when the refusal carries one of them — a refusal the person typed at a permission prompt carries none. `schema` fails when a marker no longer appears in ArchHook.java, so a reworded message cannot silently turn the dialog off.",
     "deny_markers": ["guard: force push blocked", "is outside its territory", "its specs are immutable"]
+  },
+
+  "boundary_map": {
+    "$comment": "Read by ArchHook.java `boundary-map`, which writes the generated project's `.claude/forbidden-imports.txt` from a blueprint. A multi-module blueprint carries `forbidden_imports` per module and the mode copies them (a trailing `..` becomes `.`); a single-module one carries only `dependency_rules.forbidden`, and the mode derives one line per (from, to) pair of `packages.map` entries, plus the `framework_roots` of the `from` name when this block lists it — architecture-ddd.md § Domain: both Jackson roots, since a guard that lists one lets the other through. `source_root` is the single module's source folder, where the left side of every derived line starts. ",
+    "source_root": "src/main/java",
+    "framework_roots": {
+      "domain": ["org.springframework.", "jakarta.", "com.fasterxml.jackson.", "tools.jackson."]
+    }
   },
 
   "mcp": {

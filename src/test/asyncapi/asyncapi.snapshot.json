@@ -1,0 +1,164 @@
+{
+  "asyncapi" : "3.1.0",
+  "info" : {
+    "title" : "bank-app",
+    "version" : "1.0.0",
+    "x-generator" : "springwolf"
+  },
+  "defaultContentType" : "application/json",
+  "channels" : {
+    "bank-app.customer.kyc-verification-completed" : {
+      "address" : "bank-app.customer.kyc-verification-completed",
+      "messages" : {
+        "KycVerificationCompleted" : {
+          "$ref" : "#/components/messages/KycVerificationCompleted"
+        }
+      },
+      "bindings" : { }
+    },
+    "bank-app.customer.kyc-verification-requested" : {
+      "address" : "bank-app.customer.kyc-verification-requested",
+      "messages" : {
+        "KycVerificationRequested" : {
+          "$ref" : "#/components/messages/KycVerificationRequested"
+        }
+      },
+      "bindings" : { }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "HeadersNotUsed" : {
+        "title" : "HeadersNotUsed",
+        "type" : "object",
+        "properties" : { },
+        "description" : "No headers are present.",
+        "examples" : [ { } ]
+      },
+      "KycVerificationCompletedPayload" : {
+        "title" : "KycVerificationCompletedPayload",
+        "type" : "object",
+        "properties" : {
+          "customerId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "eventId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "verdict" : {
+            "type" : "string"
+          }
+        },
+        "examples" : [ {
+          "customerId" : "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "eventId" : "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "verdict" : "string"
+        } ]
+      },
+      "KycVerificationRequestedPayload" : {
+        "title" : "KycVerificationRequestedPayload",
+        "type" : "object",
+        "properties" : {
+          "birthDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "customerId" : {
+            "type" : "string"
+          },
+          "eventId" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "occurredAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "securityNumber" : {
+            "type" : "string"
+          }
+        },
+        "examples" : [ {
+          "birthDate" : "2015-07-20",
+          "customerId" : "string",
+          "eventId" : "string",
+          "name" : "string",
+          "occurredAt" : "2015-07-20T15:49:04-07:00",
+          "securityNumber" : "string"
+        } ]
+      }
+    },
+    "messages" : {
+      "KycVerificationCompleted" : {
+        "headers" : {
+          "$ref" : "#/components/schemas/HeadersNotUsed"
+        },
+        "payload" : {
+          "schemaFormat" : "application/vnd.aai.asyncapi+json;version=3.1.0",
+          "schema" : {
+            "$ref" : "#/components/schemas/KycVerificationCompletedPayload"
+          }
+        },
+        "name" : "KycVerificationCompleted",
+        "title" : "KycVerificationCompletedPayload",
+        "bindings" : {
+          "kafka" : {
+            "bindingVersion" : "0.5.0"
+          }
+        }
+      },
+      "KycVerificationRequested" : {
+        "headers" : {
+          "$ref" : "#/components/schemas/HeadersNotUsed"
+        },
+        "payload" : {
+          "schemaFormat" : "application/vnd.aai.asyncapi+json;version=3.1.0",
+          "schema" : {
+            "$ref" : "#/components/schemas/KycVerificationRequestedPayload"
+          }
+        },
+        "name" : "KycVerificationRequested",
+        "title" : "KycVerificationRequestedPayload",
+        "bindings" : { }
+      }
+    }
+  },
+  "operations" : {
+    "bank-app.customer.kyc-verification-completed_receive_onMessage" : {
+      "action" : "receive",
+      "channel" : {
+        "$ref" : "#/channels/bank-app.customer.kyc-verification-completed"
+      },
+      "title" : "bank-app.customer.kyc-verification-completed_receive",
+      "description" : "Receives the KYC application's verdict (APPROVED or REJECT) for a customer and records it on the customer; idempotent. Unknown verdicts and conflicts go to <topic>.dlq.",
+      "bindings" : {
+        "kafka" : {
+          "groupId" : {
+            "type" : "string",
+            "const" : "bank-app.kyc-verdict"
+          },
+          "bindingVersion" : "0.5.0"
+        }
+      },
+      "messages" : [ {
+        "$ref" : "#/channels/bank-app.customer.kyc-verification-completed/messages/KycVerificationCompleted"
+      } ]
+    },
+    "bank-app.customer.kyc-verification-requested_send_request" : {
+      "action" : "send",
+      "channel" : {
+        "$ref" : "#/channels/bank-app.customer.kyc-verification-requested"
+      },
+      "title" : "bank-app.customer.kyc-verification-requested_send",
+      "description" : "Asks the KYC application to verify a customer. Published when a customer needs KYC; partition key: customerId (string), so one customer's events stay ordered.",
+      "bindings" : { },
+      "messages" : [ {
+        "$ref" : "#/channels/bank-app.customer.kyc-verification-requested/messages/KycVerificationRequested"
+      } ]
+    }
+  }
+}

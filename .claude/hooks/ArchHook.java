@@ -24,6 +24,8 @@
 //   context SubagentStart (generated project only) — injects the pattern catalog into
 //                         each agent whose class declares pattern_catalog  (never blocks)
 //   doctor  manual      — diagnoses the setup on this machine         (never blocks)
+//   boundary-map manual — writes a generated project's .claude/forbidden-imports.txt from a
+//                         blueprint, derived for a single-module one                 (exit 2 on none)
 //   build   PostToolUse (this repo) + CI — compiles this file into ArchHook.jar
 //                         under the pinned JDK; --verify rejects a jar that differs (blocks)
 //
@@ -83,6 +85,7 @@ public class ArchHook {
                 case "compose" -> compose(args.length > 1 ? args[1] : "report", stdin);
                 case "context" -> context(args.length > 1 ? args[1] : "subagent", stdin);
                 case "export" -> export(args);
+                case "boundary-map" -> boundaryMap(args);
                 case "doctor" -> doctor(args.length > 1 && "gate".equals(args[1]));
                 case "build"  -> build(args);
                 default -> { err("Unknown mode: " + mode); System.exit(0); }
@@ -2457,7 +2460,7 @@ public class ArchHook {
                      List<String> vocabulary) {}
 
     static void export(String[] args) throws Exception {
-        String dest = null, blueprintId = null, ref = "working-tree", commit = null;
+        String dest = null, blueprintId = null, ref = null, commit = null;
         boolean dry = false;
         for (int i = 1; i < args.length; i++) {
             String a = args[i];
@@ -2483,6 +2486,18 @@ public class ArchHook {
             err("   This mode reads its lists from that file; it hardcodes none.");
             System.exit(2);
         }
+        // A tree `new-project` extracted from the source's tarball is no repository, so the
+        // stamp would read `working-tree` and `unknown`; the fetch recorded what it resolved.
+        // Read only when the source is not its own work tree, and only for a field the command
+        // line left out. Design: .claude/decisions/0163-create-project-from-the-plugin.md
+        if (sourceCommit() == null) {
+            String[] fetched = fetchMarker(sch);
+            if (fetched != null) {
+                if (ref == null) ref = fetched[0];
+                if (commit == null) commit = fetched[1];
+            }
+        }
+        if (ref == null) ref = "working-tree";
 
         Path destRoot = Paths.get(dest).toAbsolutePath().normalize();
         if (destRoot.equals(ROOT)) {
@@ -2585,13 +2600,203 @@ public class ArchHook {
         }
     }
 
+    /**
+     * The fetch marker `new-project` writes into a tree it extracted from the source's
+     * tarball: the ref and the commit it resolved with `git ls-remote`, which the tree cannot
+     * answer by itself. Returns `{ref, commit}`, either of them possibly null; null when
+     * `source.fetch_marker` is unset or names no file. A file that is not JSON, or a commit
+     * that is not a sha, exits 2 — a stamp written from a marker nobody can read would look
+     * right and point nowhere.
+     */
+    static String[] fetchMarker(Map<String, Object> sch) {
+        String rel = asStr(get(sch, "source", "fetch_marker"));
+        if (rel == null) return null;
+        String text = readOrNull(ROOT.resolve(rel));
+        if (text == null) return null;
+        Map<String, Object> m = asMap(Json.parse(text));
+        String commit = m == null ? null : asStr(m.get("commit"));
+        if (m == null || (commit != null && !commit.matches("[0-9a-f]{7,40}"))) {
+            err("❌ " + rel + (m == null ? " is not a JSON object."
+                    : " records commit `" + commit + "` — not a sha (7 to 40 lowercase hex digits)."));
+            err("   Fetch the source again with /nerviz:new-project, or pass --ref and --commit.");
+            System.exit(2);
+        }
+        return new String[] { asStr(m.get("ref")), commit };
+    }
+
     static void exportUsage() {
         err("usage: java .claude/hooks/ArchHook.java export <dest> --blueprint <id>"
                 + " [--ref <label>] [--commit <sha>] [--dry-run]");
         err("  <dest>        the target project's root (never this repository)");
         err("  --blueprint   id of a blueprint under .claude/blueprints/");
-        err("  --ref         label recorded in the provenance stamp (default: working-tree)");
-        err("  --commit      the source commit to stamp; without it, the source's own git HEAD, or \"unknown\"");
+        err("  --ref         label recorded in the provenance stamp (default: the fetch marker's, else"
+                + " working-tree)");
+        err("  --commit      the source commit to stamp; without it, the source's own git HEAD, the fetch"
+                + " marker's, or \"unknown\"");
+    }
+
+    // ── boundary-map ─────────────────────────────────────────────────────────
+
+    static void boundaryMapUsage() {
+        err("usage: java .claude/hooks/ArchHook.java boundary-map <dest> --blueprint <id>"
+                + " --package <base.package>");
+        err("  <dest>        the generated project's root; <dest>/.claude/forbidden-imports.txt is written");
+        err("  --blueprint   id of a blueprint under .claude/blueprints/");
+        err("  --package     the project's base package, as the Initializr was given it (com.acme.shop)");
+    }
+
+    /**
+     * {@code boundary-map <dest> --blueprint <id> --package <pkg>} — writes the generated project's
+     * {@code .claude/forbidden-imports.txt}, the file {@code check} and {@code doctor gate} read. A
+     * {@code multi-module} blueprint declares {@code forbidden_imports} per module: one line per
+     * prefix, {@code <module-path>|<prefix>}, the ArchUnit {@code ..} suffix read as a package
+     * prefix. A {@code single-module} one declares only {@code dependency_rules.forbidden} by
+     * layer name: each name resolves to the {@code packages.map} entries it equals or prefixes
+     * (a name no entry matches is reported and skipped), and every (from, to) pair becomes
+     * {@code <source_root>/<package path of from>|<package of to>.}, the {@code from} name's
+     * {@code boundary_map.framework_roots} added as targets. A pair where one package contains the
+     * other is dropped — it would forbid a package its own imports. Exit 2, nothing written, when
+     * the blueprint yields no line: a map with no rule blocks nothing.
+     *
+     * <p>Why a mode: {@code project-files.md} § 5 used to describe the single-module derivation in
+     * prose an agent ran, so no test could hold it and the multi-module copy was a transcription.
+     * Motivated by decision 0166's gap — no CI step generated any blueprint — and chosen over a
+     * second derivation inside the test, which would drift from the prose (invariant 2). The
+     * closest rejected form is a skill step, which cannot be proven.
+     */
+    static void boundaryMap(String[] args) throws Exception {
+        String dest = null, id = null, pkg = null;
+        for (int i = 1; i < args.length; i++) {
+            String a = args[i];
+            if (a.equals("--blueprint") && i + 1 < args.length) id = args[++i];
+            else if (a.equals("--package") && i + 1 < args.length) pkg = args[++i];
+            else if (a.startsWith("--")) { err("❌ Unknown option: " + a); boundaryMapUsage(); System.exit(2); }
+            else if (dest == null) dest = a;
+            else { err("❌ Only one destination is accepted, got also: " + a); boundaryMapUsage(); System.exit(2); }
+        }
+        if (dest == null || id == null || pkg == null) { boundaryMapUsage(); System.exit(2); }
+        if (!pkg.matches("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*")) {
+            err("❌ --package is a dotted Java package name, got: " + pkg);
+            System.exit(2);
+        }
+
+        Map<String, Object> sch = asMap(Json.parse(readOrNull(ROOT.resolve(SCHEMA_FILE))));
+        Map<String, Object> bm = sch == null ? null : asMap(sch.get("boundary_map"));
+        if (bm == null) {
+            err("❌ No `boundary_map` block in " + SCHEMA_FILE + " — this mode reads its lists from it.");
+            System.exit(2);
+        }
+        String tpl = asStr(get(sch, "export", "blueprint", "path"));
+        Path file = ROOT.resolve((tpl == null ? ".claude/blueprints/{id}/{id}.yaml" : tpl).replace("{id}", id));
+        if (!Files.isRegularFile(file)) {
+            err("❌ Blueprint `" + id + "` not found at " + relative(file));
+            err("   Available: " + availableBlueprints());
+            System.exit(2);
+        }
+        List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+        String layout = yamlNestedMap(lines, List.of("build")).get("layout");
+        Set<String> out = new LinkedHashSet<>();
+        List<String> unresolved = new ArrayList<>();
+
+        if ("single-module".equals(layout)) {
+            String sourceRoot = asStr(bm.get("source_root"));
+            Map<String, String> map = yamlNestedMap(lines, List.of("packages", "map"));
+            Map<String, Object> roots = asMap(bm.get("framework_roots"));
+            String basePath = pkg.replace('.', '/');
+            for (String[] rule : yamlDependencyRules(lines)) {
+                List<String> froms = resolveLayer(map, rule[0]);
+                if (froms.isEmpty()) unresolved.add(rule[0]);
+                List<String> tos = new ArrayList<>();
+                for (String t : rule[1].split(",")) {
+                    if (t.isBlank()) continue;
+                    List<String> r = resolveLayer(map, t.strip());
+                    if (r.isEmpty()) unresolved.add(t.strip()); else tos.addAll(r);
+                }
+                for (String from : froms) {
+                    String left = sourceRoot + "/" + basePath + "/" + from.replace('.', '/');
+                    if (roots != null) {
+                        for (String root : asStrList(roots.get(rule[0]))) out.add(left + "|" + root);
+                    }
+                    for (String to : tos) {
+                        if (to.equals(from) || to.startsWith(from + ".") || from.startsWith(to + ".")) continue;
+                        out.add(left + "|" + pkg + "." + to + ".");
+                    }
+                }
+            }
+        } else {
+            for (String[] m : yamlModules(lines)) {
+                for (String prefix : m[1].isEmpty() ? new String[0] : m[1].split("\n")) {
+                    out.add(m[0] + "|" + (prefix.endsWith("..") ? prefix.substring(0, prefix.length() - 1) : prefix));
+                }
+            }
+        }
+        for (String u : new TreeSet<>(unresolved)) {
+            err("⚠️  boundary-map: `" + u + "` matches no entry of packages.map in " + id + " — its rules are skipped.");
+        }
+        if (out.isEmpty()) {
+            err("❌ boundary-map: " + id + " yields no rule — nothing written. A boundary map with no line blocks nothing.");
+            System.exit(2);
+        }
+        Path target = Paths.get(dest).toAbsolutePath().normalize().resolve(".claude/forbidden-imports.txt");
+        Files.createDirectories(target.getParent());
+        Files.writeString(target, "# Generated by /init-project — blueprint: " + id + " — do not edit by hand\n"
+                + String.join("\n", out) + "\n", StandardCharsets.UTF_8);
+        System.out.println("✅ boundary-map: " + out.size() + " rule(s) for " + id + " in " + target);
+    }
+
+    /** Every packages.map value whose key equals {@code name} or sits under {@code name + "."}. */
+    static List<String> resolveLayer(Map<String, String> map, String name) {
+        List<String> out = new ArrayList<>();
+        map.forEach((k, v) -> { if (k.equals(name) || k.startsWith(name + ".")) out.add(v); });
+        return out;
+    }
+
+    /** {@code dependency_rules.forbidden}: one {@code {from, "a, b, c"}} per entry. */
+    static List<String[]> yamlDependencyRules(List<String> lines) {
+        List<String[]> out = new ArrayList<>();
+        int i = indexOfTopKey(lines, "dependency_rules");
+        if (i < 0) return out;
+        String from = null;
+        for (int j = i + 1; j < lines.size(); j++) {
+            String l = lines.get(j);
+            if (l.isBlank() || l.trim().startsWith("#")) continue;
+            if (indentOf(l) == 0) break;
+            Matcher f = Pattern.compile("^\\s*-\\s*from:\\s*(\\S+)").matcher(l);
+            if (f.find()) { from = unquote(f.group(1)); continue; }
+            Matcher t = Pattern.compile("^\\s*to:\\s*\\[([^\\]]*)\\]").matcher(l);
+            if (from != null && t.find()) { out.add(new String[] { from, t.group(1) }); from = null; }
+        }
+        return out;
+    }
+
+    /** {@code modules[]}: one {@code {path, forbidden_imports joined by \n}} per module. */
+    static List<String[]> yamlModules(List<String> lines) {
+        List<String[]> out = new ArrayList<>();
+        int i = indexOfTopKey(lines, "modules");
+        if (i < 0) return out;
+        String path = null;
+        List<String> forbidden = new ArrayList<>();
+        boolean inForbidden = false;
+        for (int j = i + 1; j <= lines.size(); j++) {
+            String l = j < lines.size() ? lines.get(j) : "";
+            boolean end = j == lines.size() || (!l.isBlank() && !l.trim().startsWith("#") && indentOf(l) == 0);
+            boolean next = l.matches("^\\s*-\\s*id:.*");
+            if ((end || next) && path != null) {
+                out.add(new String[] { path, String.join("\n", forbidden) });
+                path = null;
+                forbidden = new ArrayList<>();
+                inForbidden = false;
+            }
+            if (end) break;
+            if (l.isBlank() || l.trim().startsWith("#")) continue;
+            Matcher p = Pattern.compile("^\\s+path:\\s*(.+?)\\s*$").matcher(l);
+            if (p.matches()) { path = unquote(p.group(1)); continue; }
+            if (l.matches("^\\s+forbidden_imports:.*")) { inForbidden = true; continue; }
+            Matcher item = Pattern.compile("^\\s+-\\s*(.+?)\\s*$").matcher(l);
+            if (inForbidden && item.matches()) { forbidden.add(unquote(item.group(1))); continue; }
+            if (l.matches("^\\s{4}[A-Za-z_]+:.*")) inForbidden = false;
+        }
+        return out;
     }
 
     /** Reads `packages.map`, `architecture_paths` and the naming-convention comment block. */
@@ -6485,6 +6690,15 @@ public class ArchHook {
      * Started on is counted, deduplicated by message id like every audit report. Names in
      * `audit.genesis` of extensions.json (invariant 10). Exit 1, saying why, on anything it
      * cannot fill; it never overwrites a filled record.
+     *
+     * Started has two anchors, and the latest of either wins. A typed `/init-project` leaves a
+     * `<command-name>` tag in a user entry; a session that reaches the skill through the Skill
+     * tool leaves none, only a tool result whose `toolUseResult.commandName` is the skill, so
+     * Started is the prompt that shares that result's `promptId`, or the result itself when no
+     * prompt does (0164, issue #146). Why this is Form 7c: the figures must come from a
+     * deterministic reader (0123), the closest rejected form is a `permissions.deny` on the
+     * Skill tool, which refuses the path instead of measuring it and rests on a runtime
+     * behavior nobody proved.
      */
     static void auditGenesis(String[] args) throws Exception {
         if (args.length < 4) {
@@ -6528,21 +6742,31 @@ public class ArchHook {
             System.exit(1);
         }
 
-        String tag = "<command-name>/" + asStr(cfg.get("command")) + "</command-name>";
+        String command = asStr(cfg.get("command"));
+        String tag = "<command-name>/" + command + "</command-name>";
+        List<String> lines = Files.readAllLines(transcript, StandardCharsets.UTF_8);
         long start = 0;
-        for (String line : Files.readAllLines(transcript, StandardCharsets.UTF_8)) {
-            if (!line.contains(tag)) continue;
+        for (String line : lines) {
+            boolean typed = line.contains(tag), viaSkill = line.contains("commandName");
+            if (!typed && !viaSkill) continue;
             Object e = Json.parse(line);
+            if (!"user".equals(asStr(get(e, "type")))) continue;
             // The typed command is a user message whose content is a plain string. A tool result
             // is a user message too, with a list of blocks — and one that echoes a file citing
             // the tag would otherwise move Started to whenever that file was read.
-            if ("user".equals(asStr(get(e, "type"))) && get(e, "message", "content") instanceof String c
-                    && c.contains(tag)) {
+            if (typed && get(e, "message", "content") instanceof String c && c.contains(tag)) {
                 start = Math.max(start, epochMs(asStr(get(e, "timestamp"))));
+            }
+            // The Skill tool leaves no tag. Its tool result carries the skill's name in a field
+            // the runtime writes and no file can echo into.
+            if (viaSkill && command.equals(asStr(get(e, "toolUseResult", "commandName")))) {
+                start = Math.max(start, skillPromptStart(lines, e));
             }
         }
         if (start == 0) {
-            err("❌ audit genesis: no " + tag + " message in " + transcript + " — nothing to measure from.");
+            err("❌ audit genesis: no " + tag + " message and no Skill tool result for `" + command
+                    + "` in " + transcript + " — nothing to measure from. Start the skill by typing /" + command
+                    + " as the first characters of the prompt.");
             System.exit(1);
         }
         long end = System.currentTimeMillis();
@@ -6572,6 +6796,29 @@ public class ArchHook {
         System.out.println("✅ GENESIS filled — " + genesis);
         System.out.println("   Started " + iso0 + " · Finished " + iso1);
         System.out.println("   Tokens  " + tokens);
+    }
+
+    /**
+     * Started of a run that entered through the Skill tool: the earliest plain-string user entry
+     * sharing the tool result's `promptId` — the prompt that made the model call the tool — or
+     * the result's own timestamp when the id is missing or no prompt carries it. Only a prompt
+     * at or before the result counts.
+     */
+    static long skillPromptStart(List<String> lines, Object toolResult) {
+        long at = epochMs(asStr(get(toolResult, "timestamp")));
+        String promptId = asStr(get(toolResult, "promptId"));
+        if (promptId == null) return at;
+        long first = at;
+        for (String line : lines) {
+            if (!line.contains(promptId)) continue;
+            Object e = Json.parse(line);
+            if ("user".equals(asStr(get(e, "type"))) && promptId.equals(asStr(get(e, "promptId")))
+                    && get(e, "message", "content") instanceof String) {
+                long t = epochMs(asStr(get(e, "timestamp")));
+                if (t > 0 && t < first) first = t;
+            }
+        }
+        return first;
     }
 
     // ── audit summary ────────────────────────────────────────────────────────

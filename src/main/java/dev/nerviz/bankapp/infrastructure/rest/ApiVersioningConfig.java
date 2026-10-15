@@ -36,8 +36,11 @@ public class ApiVersioningConfig implements WebMvcConfigurer {
 
     /**
      * The version is read only under {@code /api/}: {@code /actuator}, {@code /v3/api-docs} and
-     * {@code /swagger-ui} are never parsed as one. Required, no default, and an explicit supported
-     * list — removing a version from {@code addSupportedVersions} is its sunset: 400 from then on.
+     * {@code /swagger-ui} are never parsed as one. No default and an explicit supported list —
+     * removing a version from {@code addSupportedVersions} is its sunset: 400 from then on. Not
+     * "required" as a flag: a controller outside {@code /api/} ({@code /springwolf/docs}) has no
+     * version to resolve and would answer 400. Under {@code /api/} the segment is still always
+     * read and checked against the supported list, so a missing or unknown version is still 400.
      */
     @Override
     public void configureApiVersioning(ApiVersionConfigurer configurer) {
@@ -45,7 +48,7 @@ public class ApiVersioningConfig implements WebMvcConfigurer {
                 .usePathSegment(
                         VERSION_SEGMENT,
                         path -> path.pathWithinApplication().value().startsWith("/api/"))
-                .setVersionRequired(true)
+                .setVersionRequired(false)
                 .detectSupportedVersions(false)
                 .addSupportedVersions("1");
     }
