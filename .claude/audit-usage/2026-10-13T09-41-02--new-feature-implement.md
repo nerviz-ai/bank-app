@@ -87,13 +87,13 @@ No `.claude/audit-usage/plan-limits.json` — no projection. Anthropic publishes
 | 1 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Read | `docs/use-cases/UC-006-anonymize-customer/UC-006-spec.md` | 8,983 | 12 | 107,796 |
 | 2 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Read | `docs/use-cases/UC-006-anonymize-customer/10-dominio.md` | 6,383 | 11 | 70,213 |
 | 3 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Read | `docs/use-cases/UC-006-anonymize-customer/20-persistencia.md` | 6,383 | 11 | 70,213 |
-| 4 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; find src/main -type f / sort; ls s…` | 6,383 | 11 | 70,213 |
-| 5 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; cat > src/main/java/dev/nerviz/ban…` | 5,716 | 8 | 45,728 |
-| 6 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; ls docs/use-cases/UC-006-anonymize…` | 3,455 | 13 | 44,915 |
-| 7 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; grep -rnE "\.securityNumber\(\)/\.…` | 4,229 | 9 | 38,061 |
-| 8 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; grep -rnE "\.securityNumber\(\)/\.…` | 3,149 | 10 | 31,490 |
-| 9 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; cat src/main/java/dev/nerviz/banka…` | 3,149 | 10 | 31,490 |
-| 10 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app/src/main/java/dev/nerviz/bankapp; p…` | 2,742 | 7 | 19,194 |
+| 4 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd <project-dir>; find src/main -type f / sort; ls s…` | 6,383 | 11 | 70,213 |
+| 5 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd <project-dir>; cat > src/main/java/dev/nerviz/ban…` | 5,716 | 8 | 45,728 |
+| 6 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd <project-dir>; ls docs/use-cases/UC-006-anonymize…` | 3,455 | 13 | 44,915 |
+| 7 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd <project-dir>; grep -rnE "\.securityNumber\(\)/\.…` | 4,229 | 9 | 38,061 |
+| 8 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd <project-dir>; grep -rnE "\.securityNumber\(\)/\.…` | 3,149 | 10 | 31,490 |
+| 9 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd <project-dir>; cat src/main/java/dev/nerviz/banka…` | 3,149 | 10 | 31,490 |
+| 10 | `🤖 java-spring-boot-developer (Implement UC-006 domain group)` | Bash | `cd <project-dir>/src/main/java/dev/nerviz/bankapp; p…` | 2,742 | 7 | 19,194 |
 
 | Piece | By tool — added → re-read |
 |---|---|

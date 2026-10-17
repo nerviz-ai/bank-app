@@ -83,7 +83,7 @@ relatório final e o push para o GitHub.
 | groupId | `dev.nerviz` |
 | artifactId | `bank-app` |
 | Nome do projeto | `bank-app` |
-| Diretório de destino | `/Users/U131923/Documents/GitHub/bank-app` |
+| Diretório de destino | `<project-dir>` |
 
 O comando foi executado a partir do repositório Nerviz, mas este
 projeto é autocontido — nada aqui depende do meta-repo existir na máquina de quem clona.

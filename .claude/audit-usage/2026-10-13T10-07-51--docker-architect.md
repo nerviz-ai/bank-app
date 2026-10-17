@@ -78,15 +78,15 @@ No `.claude/audit-usage/plan-limits.json` — no projection. Anthropic publishes
 | # | Piece | Tool | Target | ➕ Added | 🔁 Re-read by | ♻️ Re-read tokens |
 |---|---|---|---|---|---|---|
 | 1 | `Skill(docker-architect)` | Skill | `—` | 10,888 | 14 | 152,432 |
-| 2 | `Skill(docker-architect)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; cat docker-compose.yml; echo ---EN…` | 5,842 | 13 | 75,946 |
-| 3 | `Skill(docker-architect)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; sed -n 1,80p .claude/rules/secrets…` | 2,298 | 12 | 27,576 |
-| 4 | `Skill(docker-architect)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; docker compose logs keycloak 2>&1 …` | 1,091 | 6 | 6,546 |
-| 5 | `Skill(docker-architect)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; docker manifest inspect quay.io/ke…` | 526 | 10 | 5,260 |
-| 6 | `Skill(docker-architect)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; docker compose down keycloak -v 2>…` | 962 | 5 | 4,810 |
+| 2 | `Skill(docker-architect)` | Bash | `cd <project-dir>; cat docker-compose.yml; echo ---EN…` | 5,842 | 13 | 75,946 |
+| 3 | `Skill(docker-architect)` | Bash | `cd <project-dir>; sed -n 1,80p .claude/rules/secrets…` | 2,298 | 12 | 27,576 |
+| 4 | `Skill(docker-architect)` | Bash | `cd <project-dir>; docker compose logs keycloak 2>&1 …` | 1,091 | 6 | 6,546 |
+| 5 | `Skill(docker-architect)` | Bash | `cd <project-dir>; docker manifest inspect quay.io/ke…` | 526 | 10 | 5,260 |
+| 6 | `Skill(docker-architect)` | Bash | `cd <project-dir>; docker compose down keycloak -v 2>…` | 962 | 5 | 4,810 |
 | 7 | `Skill(docker-architect)` | Bash | `curl -fsS "https://quay.io/api/v1/repository/keycloak/keycloak/tag/?limit=40&on…` | 403 | 11 | 4,433 |
-| 8 | `Skill(docker-architect)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; for i in $(seq 1 40); do s=$(docke…` | 466 | 7 | 3,262 |
-| 9 | `Skill(docker-architect)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; grep -n "dev/tcp" docker-compose.y…` | 283 | 8 | 2,264 |
-| 10 | `Skill(docker-architect)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app; set -a; . ./.env; set +a; tok() { …` | 343 | 4 | 1,372 |
+| 8 | `Skill(docker-architect)` | Bash | `cd <project-dir>; for i in $(seq 1 40); do s=$(docke…` | 466 | 7 | 3,262 |
+| 9 | `Skill(docker-architect)` | Bash | `cd <project-dir>; grep -n "dev/tcp" docker-compose.y…` | 283 | 8 | 2,264 |
+| 10 | `Skill(docker-architect)` | Bash | `cd <project-dir>; set -a; . ./.env; set +a; tok() { …` | 343 | 4 | 1,372 |
 
 | Piece | By tool — added → re-read |
 |---|---|

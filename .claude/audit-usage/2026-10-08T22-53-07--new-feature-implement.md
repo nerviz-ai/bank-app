@@ -98,13 +98,13 @@ No `.claude/audit-usage/plan-limits.json` — no projection. Anthropic publishes
 | 1 | `🤖 java-spring-boot-developer (UC-004 domain group)` | Bash | `cat docs/use-cases/UC-004-initiate-kyc-verification/40-testes.md; cat src/main/…` | 14,941 | 27 | 403,407 |
 | 2 | `🤖 java-spring-boot-developer (UC-004 domain group)` | Bash | `cat src/test/java/dev/nerviz/bankapp/ArchitectureTest.java src/test/java/dev/ne…` | 14,941 | 27 | 403,407 |
 | 3 | `🤖 java-spring-boot-developer (UC-004 domain group)` | Bash | `cat src/main/java/dev/nerviz/bankapp/infrastructure/persistence/customer/Custom…` | 10,987 | 25 | 274,675 |
-| 4 | `🤖 java-spring-boot-developer (UC-004 tests group)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app/src && cat test/java/dev/nerviz/ban…` | 10,788 | 24 | 258,912 |
+| 4 | `🤖 java-spring-boot-developer (UC-004 tests group)` | Bash | `cd <project-dir>/src && cat test/java/dev/nerviz/ban…` | 10,788 | 24 | 258,912 |
 | 5 | `🤖 java-spring-boot-developer (UC-004 adapters group)` | Bash | `sed -n 150,300p .claude/rules/messaging.md; cat .claude/skills/messaging-archit…` | 10,406 | 22 | 228,932 |
-| 6 | `🤖 java-spring-boot-developer (UC-004 tests group)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app/src && cat test/java/dev/nerviz/ban…` | 8,466 | 26 | 220,116 |
+| 6 | `🤖 java-spring-boot-developer (UC-004 tests group)` | Bash | `cd <project-dir>/src && cat test/java/dev/nerviz/ban…` | 8,466 | 26 | 220,116 |
 | 7 | `🤖 java-spring-boot-developer (UC-004 domain group)` | Read | `.claude/skills/messaging-architect/templates/OutboxRelayPublisher.java.example` | 7,648 | 28 | 214,144 |
 | 8 | `🤖 java-spring-boot-developer (UC-004 domain group)` | Read | `.claude/skills/persistence-architect/templates/OutboxEventStore.java.example` | 7,648 | 28 | 214,144 |
 | 9 | `🤖 java-spring-boot-developer (UC-004 tests group)` | Read | `docs/use-cases/UC-004-initiate-kyc-verification/UC-004-spec.md` | 7,032 | 30 | 210,960 |
-| 10 | `🤖 java-spring-boot-developer (UC-004 tests group)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app/src/main/java/dev/nerviz/bankapp/in…` | 7,743 | 27 | 209,061 |
+| 10 | `🤖 java-spring-boot-developer (UC-004 tests group)` | Bash | `cd <project-dir>/src/main/java/dev/nerviz/bankapp/in…` | 7,743 | 27 | 209,061 |
 
 | Piece | By tool — added → re-read |
 |---|---|

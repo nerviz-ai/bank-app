@@ -94,7 +94,7 @@ No `.claude/audit-usage/plan-limits.json` — no projection. Anthropic publishes
 | 6 | `🤖 java-spring-boot-developer (Implement UC-006 tests group)` | Bash | `T=src/test/java/dev/nerviz/bankapp && cat $T/ForwardedHeadersIT.java $T/infrast…` | 7,676 | 15 | 115,140 |
 | 7 | `🤖 java-spring-boot-developer` | Read | `docs/use-cases/UC-006-anonymize-customer/32-seguranca.md` | 5,152 | 22 | 113,344 |
 | 8 | `🤖 java-spring-boot-developer` | Bash | `find src -type d / grep -v test / head -50; find src/main -type f / grep -i -E …` | 5,152 | 22 | 113,344 |
-| 9 | `🤖 java-spring-boot-developer` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app/src/main/java/dev/nerviz/bankapp/in…` | 5,178 | 21 | 108,738 |
+| 9 | `🤖 java-spring-boot-developer` | Bash | `cd <project-dir>/src/main/java/dev/nerviz/bankapp/in…` | 5,178 | 21 | 108,738 |
 | 10 | `🤖 java-spring-boot-developer` | Bash | `cat src/main/resources/application.yml; ls src/main/resources src/test/resource…` | 5,178 | 21 | 108,738 |
 
 | Piece | By tool — added → re-read |

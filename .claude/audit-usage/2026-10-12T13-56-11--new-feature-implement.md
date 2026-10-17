@@ -88,7 +88,7 @@ No `.claude/audit-usage/plan-limits.json` — no projection. Anthropic publishes
 | 2 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Read | `docs/use-cases/UC-005-record-kyc-verdict/25-mensageria.md` | 5,859 | 5 | 29,295 |
 | 3 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Bash | `cat .claude/skills/messaging-architect/templates/KafkaConsumerAdapter.java.exam…` | 8,219 | 3 | 24,657 |
 | 4 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Bash | `cat .claude/rules/messaging.md; ls .claude/skills/messaging-architect/templates…` | 5,755 | 4 | 23,020 |
-| 5 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Bash | `cd /Users/U131923/Documents/GitHub/bank-app/src/main/java/dev/nerviz/bankapp &&…` | 5,755 | 4 | 23,020 |
+| 5 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Bash | `cd <project-dir>/src/main/java/dev/nerviz/bankapp &&…` | 5,755 | 4 | 23,020 |
 | 6 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Bash | `grep -n '^## \/^status:' docs/use-cases/UC-005-record-kyc-verdict/UC-005-spec.m…` | 2,473 | 6 | 14,838 |
 | 7 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Bash | `sed -n 66,125p docs/use-cases/UC-005-record-kyc-verdict/40-testes.md; grep -rln…` | 4,024 | 2 | 8,048 |
 | 8 | `/new-feature-implement` | Read | `.claude/skills/new-feature/references/entry-guardrail.md` | 1,440 | 4 | 5,760 |

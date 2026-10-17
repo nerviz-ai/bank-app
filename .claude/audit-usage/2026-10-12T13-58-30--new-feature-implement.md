@@ -106,7 +106,7 @@ No `.claude/audit-usage/plan-limits.json` — no projection. Anthropic publishes
 | 4 | `🤖 java-spring-boot-developer (Implement UC-005 tests group)` | Bash | `find . -maxdepth 2 -name pom.xml && echo --- && find src -type d \( -name domai…` | 4,516 | 69 | 311,604 |
 | 5 | `🤖 java-spring-boot-developer (Implement UC-005 tests group)` | Read | `docs/use-cases/UC-005-record-kyc-verdict/UC-005-spec.md` | 4,516 | 69 | 311,604 |
 | 6 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Read | `src/main/java/dev/nerviz/bankapp/infrastructure/messaging/outbox/KafkaOutboxEve…` | 7,252 | 41 | 297,332 |
-| 7 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Bash | `cd /private/tmp/claude-502/kafka-inspect && javap -p -classpath /Users/U131923/…` | 7,252 | 41 | 297,332 |
+| 7 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Bash | `cd /private/tmp/claude-uid/kafka-inspect && javap -p -classpath /Users/user/…` | 7,252 | 41 | 297,332 |
 | 8 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Read | `docs/use-cases/UC-005-record-kyc-verdict/25-mensageria.md` | 5,391 | 50 | 269,550 |
 | 9 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Bash | `grep -n -A5 'kafka:' docker-compose.yml 2>/dev/null / head -30; echo ---; grep …` | 7,823 | 34 | 265,982 |
 | 10 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | Bash | `find ~/.m2 -iname 'spring-kafka-*.jar' 2>/dev/null / grep -v sources / grep -v …` | 5,736 | 43 | 246,648 |
@@ -210,7 +210,7 @@ docker-compose.yml
 | `🤖 java-spring-boot-developer (Implement UC-005 adapters group)` | `Bash` | 1 | `exit 1 · 1772  02-01-1980 00:00   org/springframework/kafka/support/ExponentialBackOffWithMaxRetries.class` |
 | `🤖 java-spring-boot-developer (Implement UC-005 tests group)` | `Bash` | 1 | `exit 1 · unzip:  cannot find or open ../../kafka-cls/../../../.m2/repository/org/springframework/kafka/spring-kafka/4.1.1/spring-kafka-4.1.1-sources.jar, ../..…` |
 | `🤖 java-spring-boot-developer (Implement UC-005 tests group)` | `Bash` | 1 | `<tool_use_error>Blocked: sleep 60 followed by: echo done. To wait for a condition, use Monitor with an until-loop (e.g. 'until <check>; do sleep 2; done'). To …` |
-| `🤖 java-spring-boot-developer (Implement UC-005 tests group)` | `Read` | 1 | `EISDIR: illegal operation on a directory, read '/private/tmp/claude-502/-Users-U131923-Documents-GitHub-bank-app/71a11a4d-591f-4407-834d-e18186e4e13c/scratchpa…` |
+| `🤖 java-spring-boot-developer (Implement UC-005 tests group)` | `Read` | 1 | `EISDIR: illegal operation on a directory, read '/tmp/claude/-Users-user-Documents-GitHub-bank-app/71a11a4d-591f-4407-834d-e18186e4e13c/scratchpa…` |
 | `📘 git-publish` | `Bash` | 1 | `exit 1 · true` |
 
 > A repeated failure on the same tool is a sign of a bad spec, not bad luck.

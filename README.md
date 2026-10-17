@@ -82,7 +82,7 @@ report and the push to GitHub.
 | groupId | `dev.nerviz` |
 | artifactId | `bank-app` |
 | Project name | `bank-app` |
-| Target directory | `/Users/U131923/Documents/GitHub/bank-app` |
+| Target directory | `<project-dir>` |
 
 The command ran from the Nerviz repository, but this project is
 self-contained — nothing here depends on the meta-repo existing on whoever clones it.
