@@ -9,6 +9,6 @@ RUN ./mvnw -q -DskipTests package
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY --from=build /workspace/target/bank-app-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=build /workspace/target/app.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -12,7 +12,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * The project's one API versioning configuration ({@.claude/rules/api-rest.md} § Versioning).
- * Lives in the REST adapter's root package — its own package is what scopes the prefix. No
+ * The application's base package is what scopes the prefix, wherever this class lives. No
  * {@code spring.mvc.apiversion.*} property in {@code application.yml}: Boot would register a
  * second resolver beside this one, so the supported list has one writer.
  */
@@ -22,16 +22,20 @@ public class ApiVersioningConfig implements WebMvcConfigurer {
     /** The path segment that holds the version: {@code /api} is segment 0, {@code v1} segment 1. */
     private static final int VERSION_SEGMENT = 1;
 
+    /** The application's base package, the one scope of the version prefix. */
+    private static final String APPLICATION_PACKAGE = "dev.nerviz.bankapp";
+
     /**
-     * Every controller of this package and its subpackages, and no other — springdoc's own
-     * {@code @RestController} keeps its path, so {@code /v3/api-docs} still answers.
+     * Every controller under the application's base package, in whichever adapter package it
+     * lives, and no other — springdoc's own {@code @RestController} keeps its path, so
+     * {@code /v3/api-docs} still answers.
      */
     @Override
     public void configurePathMatch(PathMatchConfigurer configurer) {
         configurer.addPathPrefix(
                 "/api/v{version}",
                 HandlerTypePredicate.forAnnotation(RestController.class)
-                        .and(HandlerTypePredicate.forBasePackageClass(ApiVersioningConfig.class)));
+                        .and(HandlerTypePredicate.forBasePackage(APPLICATION_PACKAGE)));
     }
 
     /**

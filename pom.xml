@@ -272,6 +272,7 @@
 	</dependencies>
 
 	<build>
+		<finalName>app</finalName>
 		<pluginManagement>
 			<plugins>
 				<!-- Used by the format.sh hook. Without this, the hook does nothing. -->

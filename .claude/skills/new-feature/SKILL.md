@@ -88,8 +88,9 @@ through.
 (`@.claude/skills/new-feature-implement/SKILL.md`).
 
 **Never runs `git add`, `git commit`, or `git push`.** Neither does any skill it chains.
-Git happens only through `git-publish`, behind its two confirmations, at the end steps
-below. No end of this flow is left without an explicit git instruction.
+Git happens only through `git-publish`, which the person types — the final report prints the
+command, this flow never invokes it.
+No end of this flow is left without an explicit git instruction.
 
 **Integrates with (sequence ordered by depends-on):**
 1. `use-case-design` — invoked for a new case; skipped on resume when `00-use-case.md` exists
@@ -200,7 +201,8 @@ just wrote. Cache is block 3.4, implemented by the conditional Block C last amon
 blocks, after Block J — a decorator compiles against the port and needs its delegate, and every
 writer that must go through it already exists. The pipeline orders by who needs whose requirements;
 the spec orders by what compiles against what.
-8. `git-publish` — invoked at § Approval, per § End of flow, to commit the approved spec
+
+`git-publish` is not a step: § Approval prints its command for the person to type.
 
 The executor, `java-spring-boot-developer`, is not a step of this skill: `/new-feature-implement`
 delegates to it over an `approved` spec, in a clean session.
@@ -334,7 +336,7 @@ Usage: …
 ### 2 · Worktree, project, disk
 
 `references/entry-guardrail.md` §§ 2–4, in that order, before any question or write.
-`IGNORED` and the list of pre-existing changes travel to `git-publish` at § Approval.
+`IGNORED` and the list of pre-existing changes travel into the `/git-publish` line § Approval prints.
 
 ---
 
@@ -681,6 +683,14 @@ outbound HTTP only when step 3c wasn't, AI only when step 3d wasn't, search only
      report repeats it, citing the same `BL-NN` — a use case that answers 422
      on every real call is not a detail the reader should have to find in a test fixture
      (lessons-learned-013 § 5)
+   - **Every `errorCode` a partial names exists in its owner, or consolidation stops.** The
+     precedence table gives `errorCode` to `10-domain.md`, but precedence only settles a fact
+     written twice with different values — a code written once, in a downstream partial, is
+     settled by nothing and reaches the executor with no exception behind it (issue #167:
+     `ORDER_ALREADY_EXISTS` in `20-persistence.md`, absent from the domain). Walk every partial:
+     each code is declared in `10-domain.md` § 2 with its exception class, and each one an HTTP
+     path can return has a row in `30-rest.md` § 3 · Error map. A code missing from either is not
+     inferred into place — **stop and ask** which partial is wrong
    - **A partial that applies must carry its declared-dependency section, or consolidation
      stops.** `20-persistence.md` § 6 always; `31-graphql.md` § 11 whenever step 3g ran; `32-security.md` § 8 whenever step 3b ran;
      `28-http-client.md` § 8 whenever step 3c ran; `29-ai.md` § 10 whenever step 3d ran; `23-search.md` § 9 whenever step 3e ran;
@@ -774,34 +784,58 @@ outbound HTTP only when step 3c wasn't, AI only when step 3d wasn't, search only
 
 ## End of flow
 
-Every branch below ends in an explicit instruction. None of them runs git outside
-`git-publish`.
+Every branch below ends in an explicit instruction. None of them runs git, and none invokes
+`git-publish`: the final report prints its command for the person to type, after `/clear`.
 
 **Design and implementation never share a session.** This skill designs; a run that
 consolidated a spec ends at § Approval. An `approved` spec is implemented only by
 `/new-feature-implement UC-NNN-<slug>`, typed after `/clear`. The executor never inherits the
 conversation, but the orchestrator's thread does: every hand-back it receives, every group it
-launches and the `git-publish` after them would otherwise run at the 250–370k context the
-design phase leaves behind. The
+launches would otherwise run at the 250–370k context the design phase leaves behind — and so
+would a chained `git-publish`, which is why the report prints it after `/clear` instead. The
 second half of the pipeline lives in its own skill, so an implement run never loads this body.
 
 ### Approval — asked on every run that consolidated a spec
+
+**Read the consolidated spec once more before asking.** Approval freezes the folder — after it,
+the guard admits only the status moves and checklist toggles `guard.status_transitions` names,
+and reopening is by hand — so whatever is
+wrong in the spec at this moment ships to the executor. Three defects real runs approved
+(issues #167 and #168), fixed here, never after:
+
+- a `§` reference to a section, step or row the spec does not have — every one resolves inside
+  `UC-NNN-spec.md` or names the partial that holds it
+- text addressed to the approver or to a later run instead of the executor — "confirm before
+  approving", "TBD", "to be decided" — which either becomes a decision now or a stop-and-ask
+- a fact about another system — an identifier it assigns, a path or header it expects, a limit or
+  period it enforces, a code it answers with — that carries no source, flagged or not
+  (`@.claude/rules/spec-external-facts.md`): the source is found now, or the person who owns the
+  integration is asked, and a spec that cannot be sourced in this run stays a draft
+
+Fix each in the spec while it is still `draft`, then ask.
 
 `AskUserQuestion`: **Approve `UC-NNN-spec.md`** / **Keep as draft**.
 
 - **Keep as draft** → report the spec path and the resume command
   (`/new-feature UC-NNN-<slug>`), and stop. No git: a draft isn't a deliverable.
-- **Approve** → change the spec's line to `status: approved`, then **invoke** `git-publish`
-  via the `Skill` tool, with context `docs(UC-NNN-<slug>): approved spec` and
-  `docs/use-cases/UC-NNN-<slug>/` plus `docs/use-cases/BACKLOG.md` as the paths to stage.
-  Nothing else: a design-only run writes nothing outside `docs/`, and the guard is what makes
-  that true rather than intended. Then the final report, which ends with the two lines to
-  type next:
+- **Approve** → change the spec's line to `status: approved`. Nothing else: a design-only run
+  writes nothing outside `docs/`, and the guard is what makes that true rather than intended.
+  No `Skill` call to `git-publish` — the commit is the person's, at any moment, and a chained
+  one ran at the design phase's context and committed before the run's audit trail existed. The
+  final report ends with the three lines to type next:
 
   ```
   /clear
+  /git-publish docs(UC-NNN-<slug>): approved spec — paths: docs/use-cases/UC-NNN-<slug>/ docs/use-cases/BACKLOG.md
   /new-feature-implement UC-NNN-<slug>
   ```
+
+  When the guardrail's worktree step listed pre-existing changes (`IGNORED` or paths), the
+  `/git-publish` line ends with ` — pre-existing: <paths>` — the list itself, collapsed to
+  directories past 20 paths — so the typed command still names what it must not mix into the
+  spec's commit. `/git-publish` is optional: the person may skip it and run
+  `/new-feature-implement` first, in which case the spec rides in the `feat(UC-NNN-<slug>)`
+  commit.
 
   What used to be staged here — `docker-compose.yml` and `docker/init/**`, when the pipeline
   chained `docker-architect` — is no longer written during the run at all. Every
@@ -823,8 +857,8 @@ have — **every item a partial deferred, with the owner it left it to** (a chec
 idempotency is assumed or unknown** (or "none"), and **every personal-data field that crosses
 a boundary in clear, with its receiver** (or "none") — now a repeat of what § 8 and § 6 of the
 partials already recorded, not the first time anyone asks — three findings a reader must not have to
-reconstruct from a fixture comment or a Javadoc sentence — what `git-publish`
-did, and the next commands. After § Approval those are `/clear` and
+reconstruct from a fixture comment or a Javadoc sentence — and the next commands. After
+§ Approval those are `/clear`, the `/git-publish` line above and
 `/new-feature-implement UC-NNN-<slug>`; after **Keep as draft**, `/new-feature UC-NNN-<slug>`.
 
 ---
@@ -885,6 +919,8 @@ See `templates/feature-spec.md.example` for the full shape.
   never share a session; the implement flow is `/new-feature-implement`, a skill of its own.
 - **a decision recorded in the meta-repository** — closed input table,
   one use case per run, spec lifecycle, no `src/` and no git outside `git-publish`.
+- **a decision recorded in the meta-repository** — the
+  flow prints `/git-publish` instead of invoking it.
 - **Invariant 2** (`@CLAUDE.md`) — single owner. The orchestrator owns `UC-NNN-spec.md`;
   `use-case-design` owns number and slug.
 - **Invariant 8** (`@CLAUDE.md`) — specs via skills; code via executor.

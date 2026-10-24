@@ -106,7 +106,7 @@
       "exempt_paths": [".claude/decisions", ".claude/lessons-learned", ".claude/skills", ".claude/agents", "docs/lessons-learned"]
     },
 
-    "$comment_gate": "Read by `doctor gate`, the form the generated project's CI runs: the same report, then exit 1 when a line whose label is listed here printed ❌. A line doctor does not print — no .mcp.json, no audit directory — passes; an empty or missing list fails closed. Each label is a check of a committed file a push can break — `Boundary violations` too: every source file swept for a forbidden import, the one line that reads code rather than the setup (decision 0140). Left out on purpose: `CLAUDE_PROJECT_DIR` and `Compose`, which are runner state (a CI runner never sets the variable and never starts the services); `Maven wrapper`, which the build job already fails without and which is blind to gradlew; `Audit`, which prices runs and gates nothing; `git HEAD`, always true on a checkout; the UC and BL references, which are documentation defects. Labels match the first argument of `report(...)` in ArchHook.java exactly — DoctorGateTest fails when one stops appearing. ",
+    "$comment_gate": "Read by `doctor gate`, the form the generated project's CI runs: the same report, then exit 1 when a line whose label is listed here printed ❌. A line doctor does not print — no .mcp.json, no audit directory — passes; an empty or missing list fails closed. Each label is a check of a committed file a push can break — `Boundary violations` too: every source file swept for a forbidden import, the one line that reads code rather than the setup (decision 0140). Left out on purpose: `CLAUDE_PROJECT_DIR` and `Compose`, which are runner state (a CI runner never sets the variable and never starts the services); `Build wrapper`, which the build job already fails without; `Audit`, which prices runs and gates nothing; `git HEAD`, always true on a checkout; the UC and BL references, which are documentation defects. Labels match the first argument of `report(...)` in ArchHook.java exactly — DoctorGateTest fails when one stops appearing. ",
     "gate": {
       "labels": ["Boundaries", "Boundary violations", "Schema", "Hook jar", "Hooks", "MCP", "Audit overrides"]
     },
@@ -166,7 +166,132 @@
         "id\\s*\\(?\\s*['\"]org\\.springframework\\.boot['\"]\\s*\\)?\\s*version\\s*['\"](\\d+\\.\\d+)",
         "org\\.springframework\\.boot:spring-boot-(?:dependencies|gradle-plugin):(\\d+\\.\\d+)",
         "(?i)\\bspring[-_]?boot\\s*=\\s*\"(\\d+\\.\\d+)"
-      ]
+      ],
+      "upgrade": {
+        "$comment": "Read by ArchHook.java `upgrade-recipe`, which writes the OpenRewrite recipe that the `platform-upgrade` skill runs on a project below `min_line`. Clean room: every `to` below comes from an exemplar this repository compiles on `min_line` in CI, or from an artifact the Spring Boot BOM manages; no entry is copied from a recipe module under another license (Moderne's `rewrite-spring`), and none is to be. A wrong `from` renames nothing, a wrong `to` breaks a build, so a `to` is checked against a published artifact before it lands and a `from` against the jar of the line it leaves. The engine is data as well: `recipes` names what runs and with which options, so replacing it edits this block and no Java (invariant 10). Placeholders: `${target}` the Boot version the skill resolved from the Initializr; `${from_group}`, `${from_artifact}`, `${to_group}`, `${to_artifact}` the two sides of a `group:artifact` entry; `${from}` and `${to}` the two sides of a type entry; `${key}` and `${replacement}` a property; `${group}`, `${artifact}`, `${type}` an added starter and the type that asks for it (`requires_starter`); `${group_regex}` and `${artifact_regex}` a coordinate with its dots escaped, for a recipe that edits text; `${version}` a BOM or dependency version read from the Initializr file `--initializr` names. `recipes.unpin` removes a version the old coordinate carried from every renamed or added one, because the Spring Boot BOM manages them all; `recipes.bom` moves each BOM the build declares to the version the Initializr serves for the target; `test_reports` is where `test-diff` looks for JUnit XML. ",
+        "target_pattern": "\\d+\\.\\d+\\.\\d+",
+        "metadata_entry": "META-INF/spring-configuration-metadata.json",
+        "recipes": {
+          "bump_name": "org.nerviz.platform.Bump",
+          "properties_name": "org.nerviz.platform.Properties",
+          "bump": [
+            {"type": "org.openrewrite.maven.UpgradeParentVersion",
+             "options": {"groupId": "org.springframework.boot", "artifactId": "spring-boot-starter-parent", "newVersion": "${target}"}},
+            {"type": "org.openrewrite.maven.UpgradeDependencyVersion",
+             "options": {"groupId": "org.springframework.boot", "artifactId": "spring-boot-dependencies", "newVersion": "${target}"}},
+            {"type": "org.openrewrite.maven.UpgradePluginVersion",
+             "options": {"groupId": "org.springframework.boot", "artifactId": "spring-boot-maven-plugin", "newVersion": "${target}"}},
+            {"type": "org.openrewrite.gradle.plugins.UpgradePluginVersion",
+             "options": {"pluginIdPattern": "org.springframework.boot", "newVersion": "${target}"}},
+            {"type": "org.openrewrite.gradle.UpgradeDependencyVersion",
+             "options": {"groupId": "org.springframework.boot", "artifactId": "spring-boot-gradle-plugin", "newVersion": "${target}"}},
+            {"type": "org.openrewrite.gradle.UpgradeDependencyVersion",
+             "options": {"groupId": "org.springframework.boot", "artifactId": "spring-boot-dependencies", "newVersion": "${target}"}}
+          ],
+          "dependency": [
+            {"type": "org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId",
+             "options": {"oldGroupId": "${from_group}", "oldArtifactId": "${from_artifact}", "newGroupId": "${to_group}", "newArtifactId": "${to_artifact}"}},
+            {"type": "org.openrewrite.gradle.ChangeDependency",
+             "options": {"oldGroupId": "${from_group}", "oldArtifactId": "${from_artifact}", "newGroupId": "${to_group}", "newArtifactId": "${to_artifact}"}}
+          ],
+          "type": [
+            {"type": "org.openrewrite.java.ChangeType",
+             "options": {"oldFullyQualifiedTypeName": "${from}", "newFullyQualifiedTypeName": "${to}"}}
+          ],
+          "add": [
+            {"type": "org.openrewrite.maven.AddDependency",
+             "options": {"groupId": "${group}", "artifactId": "${artifact}", "version": "latest.release", "onlyIfUsing": "${type}"}},
+            {"type": "org.openrewrite.gradle.AddDependency",
+             "options": {"groupId": "${group}", "artifactId": "${artifact}", "version": "latest.release", "configuration": "implementation", "onlyIfUsing": "${type}"}}
+          ],
+          "unpin": [
+            {"type": "org.openrewrite.text.FindAndReplace",
+             "options": {"find": "(<groupId>${group_regex}</groupId>\\s*<artifactId>${artifact_regex}</artifactId>)\\s*<version>[^<]*</version>", "replace": "$1", "regex": "true", "filePattern": "**/pom.xml"}},
+            {"type": "org.openrewrite.text.FindAndReplace",
+             "options": {"find": "(${group_regex}:${artifact_regex}):[^'\"\\s)]+", "replace": "$1", "regex": "true", "filePattern": "**/build.gradle*"}}
+          ],
+          "bom": [
+            {"type": "org.openrewrite.maven.UpgradeDependencyVersion",
+             "options": {"groupId": "${group}", "artifactId": "${artifact}", "newVersion": "${version}"}},
+            {"type": "org.openrewrite.gradle.UpgradeDependencyVersion",
+             "options": {"groupId": "${group}", "artifactId": "${artifact}", "newVersion": "${version}"}}
+          ],
+          "property": [
+            {"type": "org.openrewrite.properties.ChangePropertyKey",
+             "options": {"oldPropertyKey": "${key}", "newPropertyKey": "${replacement}"}},
+            {"type": "org.openrewrite.yaml.ChangePropertyKey",
+             "options": {"oldPropertyKey": "${key}", "newPropertyKey": "${replacement}"}}
+          ]
+        },
+        "metadata_deprecation": {"level": "error"},
+        "engine": {
+          "$comment": "Read by the `platform-upgrade` skill, never by the mode: where the engine's own versions are listed, which artifacts it runs from, and the one trap measured on 2026-10-19 — Maven Central stops its OpenRewrite core at one release (`rewrite-bom` 8.90.4) while the Gradle plugin on the Plugin Portal keeps publishing against newer BOMs Central does not serve (`org.openrewrite:plugin` 7.40.0 and 7.41.0 import `rewrite-bom` 8.91.0, a 404 there), so `latest.release` fails to resolve. The Gradle plugin version is therefore the newest in `gradle_plugin_metadata` whose POM's `rewrite-bom` version has a POM at `central_bom`. The Maven plugin lives on Central itself and its `release` is coherent with it. Every artifact named here is Apache 2.0 (`org.openrewrite:plugin`'s POM declares it, as do the core modules and `rewrite-maven-plugin`).",
+          "maven_plugin": "org.openrewrite.maven:rewrite-maven-plugin",
+          "maven_plugin_metadata": "https://repo.maven.apache.org/maven2/org/openrewrite/maven/rewrite-maven-plugin/maven-metadata.xml",
+          "gradle_plugin": "org.openrewrite:plugin",
+          "gradle_plugin_metadata": "https://plugins.gradle.org/m2/org/openrewrite/plugin/maven-metadata.xml",
+          "gradle_plugin_pom": "https://plugins.gradle.org/m2/org/openrewrite/plugin/{version}/plugin-{version}.pom",
+          "central_bom": "https://repo.maven.apache.org/maven2/org/openrewrite/rewrite-bom/{version}/rewrite-bom-{version}.pom",
+          "initializr_starter": "https://start.spring.io/starter.tgz",
+          "initializr_dependencies": "https://start.spring.io/dependencies",
+          "initializr_accept": "application/vnd.initializr.v2.2+json",
+          "gradle_versions_all": "https://services.gradle.org/versions/all",
+          "gradle_distribution": "https://services.gradle.org/distributions/gradle-{version}-bin.zip",
+          "gradle_current": "https://services.gradle.org/versions/current",
+          "migration_guide": "https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-4.0-Migration-Guide",
+          "gradle_candidates": 12
+        },
+        "test_starters": {
+          "$comment": "Read by the `platform-upgrade` skill, not by the mode: a test slice moved out of `spring-boot-test-autoconfigure` into one artifact per technology, which `spring-boot-starter-test` no longer brings. A compile error naming a package of the left column is cured by the test-scope dependency of the right one, `group:artifact` with no version (the BOM manages it). Each pair was resolved on Maven Central: the starter's POM depends on the module whose jar holds the package.",
+          "org.springframework.boot.webmvc.test.autoconfigure": "org.springframework.boot:spring-boot-starter-webmvc-test",
+          "org.springframework.boot.data.jpa.test.autoconfigure": "org.springframework.boot:spring-boot-starter-data-jpa-test",
+          "org.springframework.boot.data.mongodb.test.autoconfigure": "org.springframework.boot:spring-boot-starter-data-mongodb-test",
+          "org.springframework.boot.data.elasticsearch.test.autoconfigure": "org.springframework.boot:spring-boot-starter-data-elasticsearch-test",
+          "org.springframework.boot.graphql.test.autoconfigure": "org.springframework.boot:spring-boot-starter-graphql-test",
+          "org.springframework.boot.jdbc.test.autoconfigure": "org.springframework.boot:spring-boot-starter-jdbc-test"
+        },
+        "requires_starter": {
+          "$comment": "Read by `upgrade-recipe --pass bump`: a type the sources use, and the starter that brings the auto-configuration which acts on it. On the line below `min_line` that auto-configuration lived in `spring-boot-autoconfigure`, so the type alone was enough; on the floor it moved into a module of its own (`CacheAutoConfiguration` is in `spring-boot-cache`, which only `spring-boot-starter-cache` brings), and the build compiles and the context fails to start. The recipe adds the starter with no version, only when a source uses the type. Each pair was checked on 2026-10-19: the class is absent from `spring-boot-autoconfigure` 4.0.8 and present in the module the starter's POM depends on.",
+          "org.springframework.cache.annotation.EnableCaching": "org.springframework.boot:spring-boot-starter-cache"
+        },
+        "test_reports": [
+          "**/target/surefire-reports/TEST-*.xml",
+          "**/target/failsafe-reports/TEST-*.xml",
+          "**/build/test-results/**/TEST-*.xml"
+        ],
+        "renames": {
+          "dependencies": [
+            {"from": "org.springframework.boot:spring-boot-starter-web", "to": "org.springframework.boot:spring-boot-starter-webmvc"},
+            {"from": "org.springframework.boot:spring-boot-starter-aop", "to": "org.springframework.boot:spring-boot-starter-aspectj"},
+            {"from": "org.testcontainers:postgresql", "to": "org.testcontainers:testcontainers-postgresql"},
+            {"from": "org.testcontainers:mongodb", "to": "org.testcontainers:testcontainers-mongodb"},
+            {"from": "org.testcontainers:elasticsearch", "to": "org.testcontainers:testcontainers-elasticsearch"},
+            {"from": "org.testcontainers:junit-jupiter", "to": "org.testcontainers:testcontainers-junit-jupiter"},
+            {"from": "org.flywaydb:flyway-core", "to": "org.springframework.boot:spring-boot-starter-flyway"},
+            {"from": "org.liquibase:liquibase-core", "to": "org.springframework.boot:spring-boot-starter-liquibase"}
+          ],
+          "types": [
+            {"from": "org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest", "to": "org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest"},
+            {"from": "org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc", "to": "org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc"},
+            {"from": "org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest", "to": "org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest"},
+            {"from": "org.springframework.boot.test.autoconfigure.data.mongo.DataMongoTest", "to": "org.springframework.boot.data.mongodb.test.autoconfigure.DataMongoTest"},
+            {"from": "org.springframework.boot.test.autoconfigure.data.elasticsearch.DataElasticsearchTest", "to": "org.springframework.boot.data.elasticsearch.test.autoconfigure.DataElasticsearchTest"},
+            {"from": "org.springframework.boot.test.autoconfigure.graphql.GraphQlTest", "to": "org.springframework.boot.graphql.test.autoconfigure.GraphQlTest"},
+            {"from": "org.springframework.boot.test.autoconfigure.graphql.tester.AutoConfigureHttpGraphQlTester", "to": "org.springframework.boot.graphql.test.autoconfigure.tester.AutoConfigureHttpGraphQlTester"},
+            {"from": "org.springframework.boot.test.mock.mockito.MockBean", "to": "org.springframework.test.context.bean.override.mockito.MockitoBean"},
+            {"from": "org.springframework.boot.test.mock.mockito.SpyBean", "to": "org.springframework.test.context.bean.override.mockito.MockitoSpyBean"},
+            {"from": "org.springframework.boot.autoconfigure.mongo.MongoClientSettingsBuilderCustomizer", "to": "org.springframework.boot.mongodb.autoconfigure.MongoClientSettingsBuilderCustomizer"},
+            {"from": "org.springframework.boot.autoconfigure.transaction.TransactionManagerCustomizers", "to": "org.springframework.boot.transaction.autoconfigure.TransactionManagerCustomizers"},
+            {"from": "org.springframework.boot.autoconfigure.graphql.GraphQlSourceBuilderCustomizer", "to": "org.springframework.boot.graphql.autoconfigure.GraphQlSourceBuilderCustomizer"},
+            {"from": "org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest", "to": "org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest"},
+            {"from": "org.springframework.boot.autoconfigure.http.client.ClientHttpRequestFactoryBuilderCustomizer", "to": "org.springframework.boot.http.client.autoconfigure.ClientHttpRequestFactoryBuilderCustomizer"},
+            {"from": "org.springframework.boot.autoconfigure.http.client.reactive.ClientHttpConnectorBuilderCustomizer", "to": "org.springframework.boot.http.client.autoconfigure.reactive.ClientHttpConnectorBuilderCustomizer"},
+            {"from": "org.testcontainers.containers.PostgreSQLContainer", "to": "org.testcontainers.postgresql.PostgreSQLContainer"},
+            {"from": "org.testcontainers.containers.MongoDBContainer", "to": "org.testcontainers.mongodb.MongoDBContainer"},
+            {"from": "org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase", "to": "org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase"}
+          ]
+        }
+      }
     }
   },
 
@@ -253,6 +378,16 @@
     "stop_maven_args": ["verify", "-DskipITs", "-Djacoco.skip=true"]
   },
 
+  "build_tools": {
+    "$comment": "Read by ArchHook.java `check` (its incremental compile), `moduleOf` and `doctor`'s `Build wrapper` line. One entry per build tool a blueprint's `build.tool` may name: `wrapper` is the file at the project root, Unix then Windows; `module_files` mark a directory as a build module; `compile` is what `check` hands the wrapper after an edit — `{module}` the module path, `{task}` its Gradle task prefix (`:a:b:`, empty for the root). The first tool whose wrapper exists wins. The `format` and `tests` hooks run Maven goals and stay Maven-only (the Stop gate does not run under Gradle, migration `stop-gate-runs-verify`). Until this block, `check` skipped its compile and `doctor` printed `Maven wrapper ❌` on every Gradle project (issue #167). ",
+    "tools": [
+      {"id": "maven", "wrapper": ["mvnw", "mvnw.cmd"], "module_files": ["pom.xml"],
+       "compile": ["-q", "-o", "-pl", "{module}", "-am", "test-compile"]},
+      {"id": "gradle", "wrapper": ["gradlew", "gradlew.bat"], "module_files": ["build.gradle.kts", "build.gradle"],
+       "compile": ["-q", "--offline", "{task}compileTestJava"]}
+    ]
+  },
+
   "skill_classes": {
     "$comment": "Single owner of what class each skill belongs to, what shape its body has, and what it is allowed to write. Read by ArchHook.java in two modes: `schema` validates the body of every .claude/skills/*/SKILL.md, `guard` enforces `write_allow` at PreToolUse. The class is the standardization unit the bodies never had: nine skills said `## Contract`, project-bootstrap said `## Skill contract`, and arch-doctor and init-project said nothing at all, with `claude plugin validate` printing `✔ Validation passed` over all of it. Coverage is total by design — a skill on disk that no class lists is the bug, and `schema` says so by name, the same discipline `export.skills.include`/`exclude` already uses. `write_allow` is a class DEFAULT and `overrides.<skill>.write_allow` replaces it: `build` holds four skills whose real territories differ by an order of magnitude (project-bootstrap writes the whole tree, gof-design-patterns writes one Java class), so the class groups their STRUCTURE and only defaults their TERRITORY. An empty list is a decision, not an omission — an observer that writes is a bug, and `ops`'s effect is `git` over Bash, which the guard does not cover. `required_sections` is matched as a PREFIX of an H2 line, which is what lets `## Procedure — design mode` satisfy `## Procedure`; order is not checked, because order changes nothing the model obeys and a reorder would become a blocking change. `design_phase` marks the classes whose open phase restricts writes; `blocked_during_design` marks the classes a Skill call cannot reach from inside one — that pair is what makes the pipeline docs-only in the mechanism instead of in prose. ",
     "match": ".claude/skills/*/SKILL.md",
@@ -294,13 +429,23 @@
         "allowed_models": ["opus", "sonnet"],
         "write_allow": [],
         "required_sections": ["## Procedure"],
-        "skills": ["project-bootstrap", "docker-architect", "arch-adopt", "gof-design-patterns", "sonarqube-setup", "transport-security-setup"],
+        "skills": ["project-bootstrap", "docker-architect", "arch-adopt", "gof-design-patterns", "sonarqube-setup", "transport-security-setup", "platform-upgrade"],
         "overrides": {
           "project-bootstrap": { "write_allow": ["**"] },
           "docker-architect": { "write_allow": ["docker-compose*.yml", "docker/**", "Dockerfile", ".env", ".env.example", ".gitignore", ".dockerignore"] },
           "arch-adopt": { "write_allow": [".claude/**", ".gitignore", "CLAUDE.md"], "audited": false },
           "gof-design-patterns": { "write_allow": ["src/**", "**/src/**"] },
           "sonarqube-setup": { "write_allow": ["pom.xml", "build.gradle", ".github/workflows/**"] },
+          "platform-upgrade": {
+            "$comment": "The build and the sources of the project being brought up to `doctor.platform.min_line`: the root build file and the wrapper files, `src/**` for the type and property renames and the compile errors left over, every path twice, rooted and under `**/`, for a multi-module layout. Never `.claude/**` — that is `arch-adopt`'s, run afterwards. `$WORK` lives outside the working tree, which the guard does not judge. ",
+            "write_allow": [
+              "pom.xml", "**/pom.xml",
+              "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts",
+              "**/build.gradle", "**/build.gradle.kts", "gradle/libs.versions.toml", "gradle.properties",
+              ".mvn/wrapper/**", "gradle/wrapper/**",
+              "src/**", "**/src/**"
+            ]
+          },
           "transport-security-setup": {
             "$comment": "The transport configuration, the HSTS filter and the two transport ITs, and the `**Transport:**` paragraph of the root CLAUDE.md. `src/test/**` whole, not the two IT names: with TLS on by default a `@SpringBootTest` that runs without the `test` profile can no longer start, and the setup adds the profile to each one it finds. Every path twice, rooted and under `**/`, for the multi-module layouts. ",
             "write_allow": [
@@ -817,6 +962,36 @@
         "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "hexagonal-single-module", "modular-monolith", "layered", "vertical-slice", "onion", "onion-single-module"],
         "note": "The `## Under another agent` section of the root CLAUDE.md said that outside Claude Code \"only the build is guaranteed\". The local build does not refuse a forbidden import: only CI's `architectural boundaries` job does, through `doctor gate`, and the build only once `test-architect` installed the ArchUnit test. The root CLAUDE.md is not rewritten by an update, so a project generated before this change keeps the false sentence until it is edited. Nothing breaks if it stays; an agent reading it may skip `doctor gate` before a push.",
         "prompt": "In the root CLAUDE.md, section `## Under another agent`, replace the sentence that starts with **Outside Claude Code, only the build is guaranteed** and ends before \"The rest of what `.claude/` enforces\" with this text, keeping everything around it: **Outside Claude Code, only CI is guaranteed**: the CI job `architectural boundaries` runs `java .claude/hooks/ArchHook.java doctor gate`, which fails on an import or a qualified name `.claude/forbidden-imports.txt` forbids, whoever wrote it. Run it before a push: the local build runs Checkstyle and the JaCoCo gate, but refuses a forbidden dependency only once `test-architect` installed the ArchUnit test. If the section or the sentence is not there, tell me so and change nothing."
+      },
+      {
+        "id": "gradle-test-filter-tests-suffix",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "hexagonal-single-module", "modular-monolith", "layered", "vertical-slice", "onion", "onion-single-module"],
+        "note": "The Gradle `test` task now runs the same classes Maven's Surefire does: its includes are Surefire's four defaults (`Test*`, `*Test`, `*Tests`, `*TestCase`), where they were `*Test` alone (.claude/rules/testing.md § Names and shape). A Gradle project generated before this change skips every class ending in `Tests` — the Initializr's `*ApplicationTests` (the context load) and, in a modular monolith, `ModularityTests` (`ApplicationModules.verify()`) — and `./gradlew build` stays green. /arch-adopt writes no build file, so the filter stays as it was. Only matters if the project builds with Gradle. Once the filter is fixed, a test that was never running can fail; each failure is a real finding, not a regression.",
+        "prompt": "Make this project's Gradle test task run every class ending in Tests. First, if the project has no build.gradle (it builds with Maven), tell me so and stop. Find the `tasks.named('test')` block (the root build.gradle, inside `subprojects` in a multi-module project). If its include line already lists '**/*Tests.class', or it has no include line, tell me so and stop. Otherwise change that one line, exactly as written, keeping the `exclude '**/*IT.class'` line below it: include '**/Test*.class', '**/*Test.class', '**/*Tests.class', '**/*TestCase.class' Then run ./gradlew build. Tests that were skipped before can now fail: list each one with its failure and what you plan to change, and wait for my go-ahead before touching anything but that include line. Change no behavior."
+      },
+      {
+        "id": "modulith-shared-open",
+        "blueprints": ["modular-monolith"],
+        "note": "The `shared` package of a modular monolith is now marked `@ApplicationModule(type = ApplicationModule.Type.OPEN)`, as the blueprint always described. Projects generated before this change have a `shared/package-info.java` holding only a one-sentence Javadoc, so Spring Modulith treats `shared` like a bounded context and `ModularityTests` fails as soon as one module imports a type of it. Nothing shows today in a Gradle project, because `ModularityTests` does not run there until the gradle-test-filter-tests-suffix migration is applied: apply that one first.",
+        "prompt": "Mark this project's Shared Kernel package as an open Spring Modulith module. First, find the package-info.java of the top-level `shared` package, directly under the base package in src/main/java (shared/package-info.java). If that file already has an @ApplicationModule annotation, tell me so and stop. Otherwise keep its Javadoc and add, after it, exactly: @ApplicationModule(type = ApplicationModule.Type.OPEN) before the `package` line, and import org.springframework.modulith.ApplicationModule after it. Then run ./mvnw verify (Gradle: ./gradlew build) and show me the result. Change no behavior."
+      },
+      {
+        "id": "modular-monolith-module-slot-boundary",
+        "blueprints": ["modular-monolith"],
+        "note": "The boundary map of a modular monolith now covers every module, not only `shared`. The blueprint declares `packages.module_slot: shared`, and `boundary-map` writes its lines with `{module}` in place of `shared`, which `check` and `doctor gate` match against any one module directory. Projects generated before this change have a `.claude/forbidden-imports.txt` naming `shared/internal/...` only: a framework import in the domain of any module created after bootstrap passes the edit-time check and the CI gate. Regenerating the file may turn the `Boundary violations` line red on code already written — that code was always outside the rule (issue #167).",
+        "prompt": "Regenerate this project's architectural boundary map so it covers every module. First, read the base package from the `package` line of the class annotated @SpringBootApplication under src/main/java. Then run, from the project root: java -jar .claude/hooks/ArchHook.jar boundary-map . --blueprint modular-monolith --package <that base package>. Show me the lines of .claude/forbidden-imports.txt that contain {module}; if there are none, stop and tell me — the blueprint copy this project carries is older than this migration. Then run java -jar .claude/hooks/ArchHook.jar doctor and show me its `Boundaries` and `Boundary violations` lines. For each file it names, list the forbidden import and the module, and propose where the code belongs per .claude/rules/architecture-ddd.md — do not move anything until I confirm. Never edit .claude/forbidden-imports.txt by hand."
+      },
+      {
+        "id": "api-version-prefix-base-package",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "hexagonal-single-module", "modular-monolith", "layered", "vertical-slice", "onion", "onion-single-module"],
+        "note": "The `/api/v{version}` prefix is now scoped to the application's base package instead of the versioning configuration's own package (.claude/rules/api-rest.md § Versioning). With one REST package per module — a modular monolith's `<module>.internal.adapter.rest` — the old predicate prefixed only the controllers beside the configuration, and every other module served unversioned paths (issue #167). A project with a single REST adapter package sees no change in any URL.",
+        "prompt": "Scope this project's API version prefix to the application's base package. First, find the class that calls addPathPrefix(\"/api/v{version}\" under src/main/java; if there is none, tell me so and stop. If its predicate already uses HandlerTypePredicate.forBasePackage with the base package, tell me so and stop. Otherwise read the base package from the `package` line of the @SpringBootApplication class, add to the configuration class a constant `private static final String APPLICATION_PACKAGE = \"<that base package>\";`, and replace HandlerTypePredicate.forBasePackageClass(<the configuration class>.class) with HandlerTypePredicate.forBasePackage(APPLICATION_PACKAGE), keeping the forAnnotation(RestController.class) part. Then list every @RestController under the base package and the path it now answers on, and run ./mvnw verify (Gradle: ./gradlew build) and show me the result. Change no handler mapping."
+      },
+      {
+        "id": "dockerfile-fixed-jar-name",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "hexagonal-single-module", "modular-monolith", "layered", "vertical-slice", "onion", "onion-single-module"],
+        "note": "The executable jar now has a fixed name, `app.jar`, and the Dockerfile copies that. Code generated before this change copies `<artifactId>-<version>.jar`: the first version bump renames the jar, `docker build` fails on the COPY, and `./mvnw verify` or `./gradlew build` stays green because nothing in the build or the generated CI builds the image. Nothing breaks until the version changes; the fix is two lines in the build file of the module that holds the `@SpringBootApplication` class and one in the Dockerfile.",
+        "prompt": "Give this project's executable jar a fixed name and make the Dockerfile copy that. If there is no Dockerfile at the root, tell me so and stop. Find the module that holds the @SpringBootApplication class (the root project in a single-module layout). Maven: in that module's pom.xml, add <finalName>app</finalName> as the first child of <build>; if the module has no spring-boot-maven-plugin in <build><plugins> (a multi-module project whose parent does not declare it), add it too, without a version. Gradle: in that module's build.gradle, add bootJar { archiveFileName = 'app.jar' } and, if the org.springframework.boot plugin is not applied there, apply it in a plugins {} block at the top of the file, without a version. Then in the Dockerfile change the COPY --from=build source to <that module's path, empty for a single-module layout>target/app.jar on Maven, or build/libs/app.jar under the module's path on Gradle. Change nothing else. Run docker build -t app-check . and show me the result; if Docker is not available, run ./mvnw -DskipTests package or ./gradlew bootJar instead and show me the path of the jar it wrote."
       }
     ]
   },
@@ -870,7 +1045,7 @@
   },
 
   "boundary_map": {
-    "$comment": "Read by ArchHook.java `boundary-map`, which writes the generated project's `.claude/forbidden-imports.txt` from a blueprint. A multi-module blueprint carries `forbidden_imports` per module and the mode copies them (a trailing `..` becomes `.`); a single-module one carries only `dependency_rules.forbidden`, and the mode derives one line per (from, to) pair of `packages.map` entries, plus the `framework_roots` of the `from` name when this block lists it — architecture-ddd.md § Domain: both Jackson roots, since a guard that lists one lets the other through. `source_root` is the single module's source folder, where the left side of every derived line starts. ",
+    "$comment": "Read by ArchHook.java `boundary-map`, which writes the generated project's `.claude/forbidden-imports.txt` from a blueprint. A multi-module blueprint carries `forbidden_imports` per module and the mode copies them (a trailing `..` becomes `.`); a single-module one carries only `dependency_rules.forbidden`, and the mode derives one line per (from, to) pair of `packages.map` entries, plus the `framework_roots` of the `from` name when this block lists it — architecture-ddd.md § Domain: both Jackson roots, since a guard that lists one lets the other through. A blueprint that declares `packages.module_slot` gets that first segment written as `{module}` on both sides of each derived line, and `check` matches `{module}` against any one directory, so modules created after bootstrap are covered (decision 0180). `source_root` is the single module's source folder, where the left side of every derived line starts. ",
     "source_root": "src/main/java",
     "framework_roots": {
       "domain": ["org.springframework.", "jakarta.", "com.fasterxml.jackson.", "tools.jackson."]
