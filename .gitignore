@@ -35,3 +35,4 @@ build/
 .env
 .claude/audit-usage/.state/
 docs/lessons-learned/
+.DS_Store
