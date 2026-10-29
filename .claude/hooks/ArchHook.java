@@ -96,6 +96,7 @@ public class ArchHook {
                 case "test-diff" -> testDiff(args);
                 case "doctor" -> doctor(args.length > 1 && "gate".equals(args[1]));
                 case "config" -> config(args);
+                case "footprint" -> footprint();
                 case "build"  -> build(args);
                 default -> { err("Unknown mode: " + mode); System.exit(0); }
             }
@@ -518,6 +519,11 @@ public class ArchHook {
                         set.isEmpty() ? "no budget set — no plan window projection" : set,
                         String.join("; ", lim));
             }
+
+            // Never `report(…, false, …)`: the snapshot is the person's own status line, optional and
+            // absent on an API key — a ❌ here would read as a broken project (0194), like Platform.
+            String[] pu = auditSch == null ? null : planUsageDoctor(auditSch);
+            if (pu != null) err("  Plan usage ........ " + pu[0] + pu[1]);
 
             // A synthetic touched file that matches a real rule's `paths` — the exact
             // shape that once threw `ArrayIndexOutOfBoundsException` inside rule
@@ -6340,6 +6346,9 @@ public class ArchHook {
         kv.add("head");        kv.add(gitShort());
         kv.add("perm_before"); kv.add(String.join(" ", localPermissions()));
         append(log, ev("run_start", kv.toArray(new String[0])));
+        // Root runs only: a nested node overlaps its parent's window (0194).
+        String before = planUsageEvent("before");
+        if (before != null) append(log, before);
     }
 
     /**
@@ -6710,6 +6719,10 @@ public class ArchHook {
      */
     static void auditRender(Path dir, Path log, Object in, boolean closing) throws Exception {
         if (!Files.isRegularFile(log)) return;
+        // The status line refreshes 300 ms after the last response, after `Stop`: the reading
+        // taken at `flush` is provisional, the one at `close` is the run's final (0194).
+        String reading = planUsageEvent(closing ? "after" : "provisional");
+        if (reading != null) append(log, reading);
         List<Map<String, Object>> events = new ArrayList<>();
         for (String line : Files.readAllLines(log, StandardCharsets.UTF_8)) {
             Map<String, Object> e = asMap(Json.parse(line));
@@ -7028,6 +7041,8 @@ public class ArchHook {
         md.append("Cache hit ").append(pct(all.cacheRead(), Math.max(1, ctx))).append(" ")
           .append(bar(hit)).append("\n\n");
 
+        List<Object[]> planUsage = planUsageReadings(events);
+        md.append(planUsageSection(planUsage));
         md.append(planWindowsSection(dir, all.billable(), total));
 
         md.append("## 🔎 Where the run spent\n\n");
@@ -7233,8 +7248,7 @@ public class ArchHook {
 
         if (closing) {
             String failures = String.valueOf(fails.values().stream().mapToInt(Integer::intValue).sum());
-            Files.writeString(dir.resolve("history.jsonl"),
-                    ev("run", "skill", skill, "kind", kind, "origin", origin, "start", startIso,
+            String row = ev("run", "skill", skill, "kind", kind, "origin", origin, "start", startIso,
                        // The model is what the report's header showed and the ledger did
                        // not: a token weighs differently on Sonnet and on Opus, and the
                        // comparison had to be rebuilt by hand from the reports
@@ -7260,7 +7274,10 @@ public class ArchHook {
                        "peak_context_self", rootSpend.peak == 0 ? null : String.valueOf(rootSpend.peak),
                        "files", String.valueOf(touched.size()),
                        "failures", failures,
-                       "report", relative(report)) + "\n",
+                       "report", relative(report));
+            // The deltas are numbers (null = not a valid delta), which `ev` does not write.
+            Files.writeString(dir.resolve("history.jsonl"),
+                    row.substring(0, row.length() - 1) + planUsageField(planUsage) + "}\n",
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
 
             // One line per nested piece of this project, in a ledger of its own: the run
@@ -7634,7 +7651,7 @@ public class ArchHook {
     // billable tokens like every other number of the trail; every other number is
     // `audit.plans` / `audit.windows` — nothing here is a constant (0133, unit by 0134).
 
-    /** `audit.windows` as {key, label, hours, budget field}, in file order. */
+    /** `audit.windows` as {key, label, hours, budget field, rate_limits_key}, in file order. */
     static List<String[]> planWindows(Map<String, Object> sch) {
         List<String[]> out = new ArrayList<>();
         Map<String, Object> w = asMap(get(sch, "audit", "windows"));
@@ -7643,7 +7660,8 @@ public class ArchHook {
             Map<String, Object> m = asMap(e.getValue());
             if (m == null || lnum(m.get("hours")) <= 0) continue;
             out.add(new String[] {e.getKey(), orDash(asStr(m.get("label"))),
-                    String.valueOf(lnum(m.get("hours"))), asStr(m.get("budget"))});
+                    String.valueOf(lnum(m.get("hours"))), asStr(m.get("budget")),
+                    asStr(m.get("rate_limits_key"))});
         }
         return out;
     }
@@ -7672,6 +7690,242 @@ public class ArchHook {
         long byBudget = (long) Math.floor(budget * m.doubleValue() / tokens);
         long byTime = durationMs <= 0 ? Long.MAX_VALUE : Long.parseLong(window[2]) * 3_600_000L / durationMs;
         return byTime < byBudget ? n(byTime) + " · time" : n(byBudget) + " · budget";
+    }
+
+    // ── plan usage: the account's real windows, measured around a run (0194) ────────
+    // Every name, path and number is `audit.plan_usage` / `audit.windows` — nothing here is a
+    // constant (invariant 10). Only numbers leave the snapshot, never any of its text.
+
+    /** `audit.plan_usage` with `audit.windows`, or null when either is not declared. */
+    static Map<String, Object> planUsageConfig(Map<String, Object> sch) {
+        Map<String, Object> pu = sch == null ? null : asMap(get(sch, "audit", "plan_usage"));
+        return pu == null || asStr(pu.get("snapshot")) == null || planWindows(sch).isEmpty() ? null : pu;
+    }
+
+    /** The snapshot's file: `~` is `user.home`, read at call time so a test can point it elsewhere. */
+    static Path planUsageFile(String snapshot) {
+        return Paths.get(snapshot.startsWith("~") ? System.getProperty("user.home") + snapshot.substring(1) : snapshot);
+    }
+
+    /** Decimals of `audit.plan_usage.resolution_pp` — the precision a delta is worth printing at. */
+    static int planUsageDigits(Map<String, Object> pu) {
+        String r = fmtNum(Objects.requireNonNullElse(dbl(pu.get("resolution_pp")), 0.1));
+        int dot = r.indexOf('.');
+        return dot < 0 ? 0 : r.length() - dot - 1;
+    }
+
+    /**
+     * Reads the account's plan-usage windows from the snapshot a personal status line writes, at a
+     * run's open (`prompt`/`call`), `flush` and `close`. It lives in the `audit` mode because the
+     * run's boundaries are already its events and only the status line's stdin carries the numbers
+     * (0194; no hook input does). The rejected alternative — a `statusLine` in the project's
+     * settings — would override the status line of everyone who clones the project (0133 fact 5).
+     *
+     * <p>Returns the `plan_usage` event for {@code at} (`before`, `provisional`, `after`), or null
+     * when the data declares no snapshot. A reading that cannot be used carries its cell in
+     * `reason` instead of numbers: no snapshot, one older than `max_age_minutes`, unreadable, or —
+     * with no usable snapshot and a `not_available_env` variable set — an account with no plan
+     * window to read.
+     */
+    static String planUsageEvent(String at) {
+        Map<String, Object> sch = asMap(Json.parse(readOrNull(ROOT.resolve(SCHEMA_FILE))));
+        Map<String, Object> pu = planUsageConfig(sch);
+        if (pu == null) return null;
+        String snapshot = asStr(pu.get("snapshot"));
+        Path file = planUsageFile(snapshot);
+        List<String> kv = new ArrayList<>(List.of("at", at));
+        String reason = null;
+        Map<String, Object> snap = null;
+        if (!Files.isRegularFile(file)) {
+            reason = "not captured — no snapshot at " + snapshot;
+        } else {
+            try {
+                long mtime = Files.getLastModifiedTime(file).toMillis();
+                long age = Math.max(0, System.currentTimeMillis() - mtime) / 60_000;
+                kv.add("mtime"); kv.add(String.valueOf(mtime));
+                if (age > lnum(pu.get("max_age_minutes"))) {
+                    reason = "not captured — snapshot " + age + " min old (max " + lnum(pu.get("max_age_minutes")) + ")";
+                } else {
+                    snap = asMap(Json.parse(readOrNull(file)));
+                    if (snap == null) reason = "not captured — unreadable snapshot";
+                }
+            } catch (IOException e) {
+                reason = "not captured — unreadable snapshot";
+            }
+        }
+        if (reason != null) {
+            for (String var : asStrList(pu.get("not_available_env"))) {
+                String v = System.getenv(var);
+                if (v != null && !v.isEmpty()) { reason = "not available — " + var + " is set"; break; }
+            }
+        } else {
+            for (String[] w : planWindows(sch)) {
+                Double used = dbl(get(snap, asStr(pu.get("root")), w[4], asStr(pu.get("used"))));
+                Double resets = dbl(get(snap, asStr(pu.get("root")), w[4], asStr(pu.get("resets_at"))));
+                kv.add(w[0] + "_used");      kv.add(used == null ? null : String.valueOf(used));
+                kv.add(w[0] + "_resets_at"); kv.add(resets == null ? null : String.valueOf(resets.longValue()));
+            }
+        }
+        kv.add("reason"); kv.add(reason);
+        return ev("plan_usage", kv.toArray(new String[0]));
+    }
+
+    /**
+     * Per window, in `audit.windows` order: {id, label, before text, after text, Δ cell, Δ in pp or
+     * null}. The before is the run's first reading; the after is the last — `after` once the run
+     * closed, `provisional` before. The Δ is a number only when both readings are valid, in the same
+     * window, and final.
+     */
+    static List<Object[]> planUsageReadings(List<Map<String, Object>> events) {
+        Map<String, Object> sch = asMap(Json.parse(readOrNull(ROOT.resolve(SCHEMA_FILE))));
+        Map<String, Object> pu = planUsageConfig(sch);
+        List<Object[]> out = new ArrayList<>();
+        if (pu == null) return out;
+        Map<String, Object> before = null, last = null;
+        for (Map<String, Object> e : events) {
+            if (!"plan_usage".equals(asStr(e.get("e")))) continue;
+            String at = asStr(e.get("at"));
+            if ("before".equals(at) && before == null) before = e;
+            else if ("after".equals(at) || "provisional".equals(at)) last = e;
+        }
+        if (before == null && last == null) return out;
+        int digits = planUsageDigits(pu);
+        double resolution = Objects.requireNonNullElse(dbl(pu.get("resolution_pp")), 0.1);
+        for (String[] w : planWindows(sch)) {
+            String why = null;                                   // first reading that is no number
+            Double b = null, a = null;
+            long bReset = 0, aReset = 0;
+            for (int i = 0; i < 2; i++) {
+                Map<String, Object> e = i == 0 ? before : last;
+                Double used = null;
+                String reason = null;
+                if (e == null) {
+                    reason = "not captured — no reading";
+                } else if (asStr(e.get("reason")) != null) {
+                    reason = asStr(e.get("reason"));
+                } else if (e.get(w[0] + "_used") == null || e.get(w[0] + "_resets_at") == null) {
+                    reason = "not captured — window absent in the snapshot";
+                } else {
+                    used = Double.valueOf(asStr(e.get(w[0] + "_used")));
+                }
+                if (reason != null && why == null) why = reason;
+                if (i == 0) { b = used; bReset = e == null ? 0 : lnum(e.get(w[0] + "_resets_at")); }
+                else { a = used; aReset = e == null ? 0 : lnum(e.get(w[0] + "_resets_at")); }
+            }
+            String fmt = "%." + digits + "f %%";
+            String bText = b == null ? "—" : String.format(Locale.ROOT, fmt, b);
+            String aText = a == null ? "—" : String.format(Locale.ROOT, fmt, a);
+            String cell;
+            Double delta = null;
+            if (b == null || a == null) cell = why;
+            else if (bReset != aReset) cell = "not valid — the window reset mid-run";
+            else if (last != null && !"after".equals(asStr(last.get("at")))) cell = "provisional";
+            else {
+                double d = a - b;
+                // Compared after rounding: 23.4 − 23.3 is 0.0999… in binary, one step of the
+                // resolution, never "below" it.
+                delta = Math.round(d * Math.pow(10, digits)) / Math.pow(10, digits);
+                cell = Math.abs(delta) < resolution ? "< " + fmtNum(resolution) + " pp"
+                        : String.format(Locale.ROOT, "%+." + digits + "f pp", delta);
+            }
+            out.add(new Object[] {w[0], w[1], bText, aText, cell, delta});
+        }
+        return out;
+    }
+
+    /** The run report's `Plan usage` section — the account's windows before and after, measured. */
+    static String planUsageSection(List<Object[]> readings) {
+        if (readings.isEmpty()) return "";
+        Map<String, Object> sch = asMap(Json.parse(readOrNull(ROOT.resolve(SCHEMA_FILE))));
+        StringBuilder md = new StringBuilder("## 📉 Plan usage (account, measured)\n\n| Window | Before | After | Δ |\n|---|---|---|---|\n");
+        for (Object[] r : readings) {
+            md.append("| ").append(r[1]).append(" | ").append(r[2]).append(" | ").append(r[3])
+              .append(" | ").append(r[4]).append(" |\n");
+        }
+        return md.append("\nThe delta is the account's: chat, other sessions and other machines in the same window count")
+          .append(" too — it is this run's only if nothing else ran. Source: `")
+          .append(asStr(get(sch, "audit", "plan_usage", "snapshot"))).append("` (0194).\n\n").toString();
+    }
+
+    /** The `plan_usage` field of a `history.jsonl` row: `{window id: Δ in pp or null}`, prefixed with a comma. */
+    static String planUsageField(List<Object[]> readings) {
+        if (readings.isEmpty()) return "";
+        StringBuilder b = new StringBuilder(",\"plan_usage\":{");
+        for (int i = 0; i < readings.size(); i++) {
+            Object[] r = readings.get(i);
+            b.append(i == 0 ? "" : ",").append('"').append(r[0]).append("\":")
+             .append(r[5] == null ? "null" : fmtNum((Double) r[5]));
+        }
+        return b.append('}').toString();
+    }
+
+    /**
+     * `audit summary`'s measured-usage table: per piece, the mean Δ of its root runs that have a
+     * valid one, per window, and how many runs hold at least one. `—` and `n = 0` otherwise.
+     */
+    static String planUsageSummary(List<Map<String, Object>> runs) {
+        Map<String, Object> sch = asMap(Json.parse(readOrNull(ROOT.resolve(SCHEMA_FILE))));
+        Map<String, Object> pu = planUsageConfig(sch);
+        if (pu == null) return "";
+        List<String[]> windows = planWindows(sch);
+        int digits = planUsageDigits(pu);
+        Map<String, double[]> by = new LinkedHashMap<>();       // per window: sum, count; last: runs with any
+        for (Map<String, Object> r : runs) {
+            double[] a = by.computeIfAbsent(keyLabel(pieceKey(r)), k -> new double[windows.size() * 2 + 1]);
+            boolean any = false;
+            for (int i = 0; i < windows.size(); i++) {
+                Double d = dbl(get(r, "plan_usage", windows.get(i)[0]));
+                if (d == null) continue;
+                a[i * 2] += d; a[i * 2 + 1]++; any = true;
+            }
+            if (any) a[a.length - 1]++;
+        }
+        StringBuilder o = new StringBuilder("\n### Plan usage (measured)\n\n| Piece |");
+        for (String[] w : windows) o.append(' ').append(w[1]).append(" mean Δ |");
+        o.append(" n |\n|---|").append("---|".repeat(windows.size() + 1)).append('\n');
+        for (Map.Entry<String, double[]> e : by.entrySet()) {
+            double[] a = e.getValue();
+            o.append("| ").append(e.getKey()).append(" |");
+            for (int i = 0; i < windows.size(); i++) {
+                o.append(' ').append(a[i * 2 + 1] == 0 ? "—"
+                        : String.format(Locale.ROOT, "%." + digits + "f pp", a[i * 2] / a[i * 2 + 1])).append(" |");
+            }
+            o.append(' ').append("n = ").append((long) a[a.length - 1]).append(" |\n");
+        }
+        return o.append("\nthe account's delta around each root run (`## 📉 Plan usage` of its report), from the snapshot at `")
+          .append(asStr(pu.get("snapshot"))).append("`; a run whose window reset, or with no snapshot, counts in no mean\n").toString();
+    }
+
+    /**
+     * `doctor`'s `Plan usage` line: {icon, text} — ⚪ no snapshot (optional), ⚠️ stale or
+     * unreadable, ✅ fresh — or null where the data declares no snapshot. Never gated.
+     */
+    static String[] planUsageDoctor(Map<String, Object> sch) {
+        Map<String, Object> pu = planUsageConfig(sch);
+        if (pu == null) return null;
+        String snapshot = asStr(pu.get("snapshot"));
+        Path file = planUsageFile(snapshot);
+        long max = lnum(pu.get("max_age_minutes"));
+        if (!Files.isRegularFile(file)) {
+            return new String[] {"⚪ ", "no snapshot at " + snapshot + " — no measured plan usage (optional): paste "
+                    + "`.claude/skills/audit-usage/templates/statusline-rate-limits.json.example` into ~/.claude/settings.json"};
+        }
+        try {
+            long age = Math.max(0, System.currentTimeMillis() - Files.getLastModifiedTime(file).toMillis()) / 60_000;
+            if (age > max) {
+                return new String[] {"⚠️  ", "snapshot " + snapshot + " is " + age + " min old (max " + max
+                        + ") — is the status line installed?"};
+            }
+            Object snap = Json.parse(readOrNull(file));
+            List<String> present = new ArrayList<>();
+            for (String[] w : planWindows(sch)) {
+                if (dbl(get(snap, asStr(pu.get("root")), w[4], asStr(pu.get("used")))) != null) present.add(w[4]);
+            }
+            return new String[] {"✅ ", "snapshot " + snapshot + ", " + age + " min old, windows: "
+                    + (present.isEmpty() ? "none" : String.join(", ", present))};
+        } catch (IOException e) {
+            return new String[] {"⚠️  ", "snapshot " + snapshot + " is unreadable"};
+        }
     }
 
     /** The run report's `Plan windows` section: one row per plan, one column per window. */
@@ -8137,6 +8391,7 @@ public class ArchHook {
             }
 
             o.append(planWindowsSummary(dir, runs, nested));
+            o.append(planUsageSummary(runs));
 
             o.append("\n### Health\n\n").append("failure rate: ").append(failed).append('/')
              .append(runs.size()).append(" (").append(pct(failed, runs.size())).append(")");
@@ -9310,6 +9565,344 @@ public class ArchHook {
     }
 
     static void err(String s) { ERR.println(s); }
+
+    // ── footprint ────────────────────────────────────────────────────────────
+
+    /**
+     * {@code footprint} — what this {@code .claude/} puts in context: every session (root
+     * CLAUDE.md and what it imports, rules without `paths`, the listing of every model-invocable
+     * skill and every agent, MCP servers), what each piece adds once it loads (skill body, its
+     * files, injections; agent body and preloaded skills), and hook registrations per event.
+     * Markdown on stdout, read-only, exit 0 — a report, never a gate: a number past a limit is
+     * marked `over` and nothing fails on it.
+     *
+     * Why this is a mode (Form 7c) and not arithmetic left to the model: `harness-lessons`
+     * injects it, and reading ten thousand lines of SKILL.md to measure token economy would
+     * spend the tokens it measures, with numbers that change from run to run. No hook
+     * registration invokes it — the skill's injection and a person typing it are the only
+     * callers; the closest rejected form was the skill measuring alone. Paths, limits and the
+     * bytes-per-token ratio are the `footprint` block of extensions.json (invariant 10).
+     * Design: .claude/decisions/0188-harness-lessons-and-footprint-mode.md
+     */
+    static void footprint() throws IOException {
+        Map<String, Object> sch = asMap(Json.parse(readOrNull(ROOT.resolve(SCHEMA_FILE))));
+        Map<String, Object> fp = sch == null ? null : asMap(sch.get("footprint"));
+        // System.out is cp1252 on Windows; the report carries em dashes and `·`.
+        PrintStream stdout = new PrintStream(new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8);
+        if (fp == null) {
+            stdout.println("❌ footprint: no `footprint` block in " + SCHEMA_FILE
+                    + " — nothing measured.");
+            return;
+        }
+        double bpt = fpNum(fp.get("bytes_per_token"), 4);
+        Map<String, Object> lim = asMap(fp.get("limits"));
+        long limClaude = (long) fpNum(get(lim, "claude_md_lines"), Long.MAX_VALUE);
+        long limBody = (long) fpNum(get(lim, "skill_body_lines"), Long.MAX_VALUE);
+        long limListing = (long) fpNum(get(lim, "listing_chars"), Long.MAX_VALUE);
+        long limToc = (long) fpNum(get(lim, "reference_toc_lines"), Long.MAX_VALUE);
+        List<String> listingFields = asStrList(fp.get("listing_fields"));
+        List<String> tocDirs = asStrList(fp.get("toc_dirs"));
+        List<String> over = new ArrayList<>();
+
+        StringBuilder out = new StringBuilder();
+        out.append("## Footprint — ").append(ROOT.getFileName())
+           .append("\n\nTokens are an estimate: bytes ÷ ").append(fmtNum(bpt))
+           .append(" (`footprint.bytes_per_token`). `over` marks a number past `footprint.limits`.\n");
+
+        // ── every session ──
+        List<String[]> session = new ArrayList<>();
+        long sessionBytes = 0;
+        for (String rel : asStrList(fp.get("claude_md"))) {
+            Path p = ROOT.resolve(rel);
+            String c = readOrNull(p);
+            if (c == null) continue;
+            long lines = c.lines().count(), bytes = utf8(c);
+            String note = lines > limClaude ? "over " + limClaude + " lines" : "";
+            if (!note.isEmpty()) over.add("`" + rel + "` — " + lines + " lines (limit " + limClaude + ")");
+            session.add(new String[] {"`" + rel + "`", "" + lines, "" + bytes, tok(bytes, bpt), note});
+            sessionBytes += bytes;
+            List<String[]> imports = new ArrayList<>();
+            sessionBytes += fpImports(p, 1, (int) fpNum(fp.get("import_max_depth"), 4),
+                    new HashSet<>(Set.of(p.normalize())), imports, bpt);
+            session.addAll(imports);
+        }
+
+        List<Path> rules = fpFiles(asStr(fp.get("rules")));
+        List<String[]> scopedRules = new ArrayList<>();
+        List<String> unscoped = new ArrayList<>();
+        long unscopedBytes = 0, unscopedLines = 0;
+        for (Path r : rules) {
+            String c = readOrNull(r);
+            if (c == null) continue;
+            Map<String, String> fm = frontmatter(c);
+            String body = fpBody(c);
+            long bytes = utf8(body), lines = body.lines().count();
+            String name = r.getFileName().toString();
+            if (fm != null && fm.containsKey("paths")) {
+                scopedRules.add(new String[] {"`" + name + "`", "" + lines, tok(bytes, bpt),
+                        String.join(", ", fpList(c, "paths"))});
+            } else {
+                unscoped.add(name);
+                unscopedBytes += bytes;
+                unscopedLines += lines;
+            }
+        }
+        if (!unscoped.isEmpty()) {
+            session.add(new String[] {"rules without `paths` (" + unscoped.size() + "): "
+                    + String.join(", ", unscoped), "" + unscopedLines, "" + unscopedBytes,
+                    tok(unscopedBytes, bpt), ""});
+            sessionBytes += unscopedBytes;
+        }
+
+        // Skills: the listing is per session, the body per invocation.
+        List<Path> skillFiles = fpFiles(asStr(fp.get("skills")));
+        List<long[]> skillNums = new ArrayList<>();
+        List<String[]> skillRows = new ArrayList<>();
+        Map<String, Long> skillBodyBytes = new HashMap<>();
+        long listingChars = 0;
+        int listed = 0;
+        for (Path s : skillFiles) {
+            String c = readOrNull(s);
+            if (c == null) continue;
+            String name = s.getParent().getFileName().toString();
+            Map<String, String> fm = frontmatter(c);
+            if (fm == null) fm = Map.of();
+            boolean manual = "true".equals(fm.get("disable-model-invocation"));
+            long chars = 0;
+            for (String f : listingFields) chars += fpText(c, f).length();
+            if (!manual) { listingChars += Math.min(chars, limListing); listed++; }
+            String body = fpBody(c);
+            long lines = body.lines().count(), bytes = utf8(body);
+            skillBodyBytes.put(name, bytes);
+            String scanned = TICK_SPAN.matcher(FENCE.matcher(body).replaceAll("")).replaceAll("");
+            Matcher im = INJECTION.matcher(scanned);
+            int inj = 0;
+            while (im.find()) inj++;
+            long[] files = {0, 0};
+            List<String> noToc = new ArrayList<>();
+            try (Stream<Path> w = Files.walk(s.getParent())) {
+                for (Path f : w.filter(Files::isRegularFile).filter(f -> !f.equals(s)).sorted()
+                        .collect(Collectors.toList())) {
+                    String fc = readOrNull(f);
+                    files[0]++;
+                    files[1] += fc == null ? 0 : utf8(fc);
+                    String frel = s.getParent().relativize(f).toString().replace('\\', '/');
+                    if (fc != null && frel.endsWith(".md") && tocDirs.stream().anyMatch(d -> frel.startsWith(d + "/"))
+                            && fc.lines().count() > limToc
+                            && !Pattern.compile("(?im)^#+\\s*(table of )?contents\\b").matcher(fc).find())
+                        noToc.add(frel);
+                }
+            }
+            List<String> flags = new ArrayList<>();
+            if (lines > limBody) {
+                flags.add("over " + limBody + " lines");
+                over.add("skill `" + name + "` — body " + lines + " lines (limit " + limBody + ")");
+            }
+            if (chars > limListing) {
+                flags.add("listing truncated");
+                over.add("skill `" + name + "` — listing " + chars + " chars (limit " + limListing + ")");
+            }
+            for (String n : noToc) {
+                over.add("skill `" + name + "` — `" + n + "` over " + limToc + " lines without a contents list");
+            }
+            skillNums.add(new long[] {bytes, skillRows.size()});
+            skillRows.add(new String[] {"`" + name + "`", "" + lines, tok(bytes, bpt),
+                    manual ? "manual" : "" + chars, files[0] + " / " + tok(files[1], bpt), "" + inj,
+                    fm.getOrDefault("model", "—"), fm.getOrDefault("effort", "—"),
+                    String.join("; ", flags)});
+        }
+        session.add(new String[] {"skill listing (" + listed + " model-invocable of "
+                + skillRows.size() + ")", "—", listingChars + " chars", tok(listingChars, bpt), ""});
+        sessionBytes += listingChars;
+
+        List<Path> agentFiles = fpFiles(asStr(fp.get("agents")));
+        List<String[]> agentRows = new ArrayList<>();
+        long agentListing = 0;
+        for (Path a : agentFiles) {
+            String c = readOrNull(a);
+            if (c == null) continue;
+            Map<String, String> fm = frontmatter(c);
+            if (fm == null) fm = Map.of();
+            agentListing += fpText(c, "description").length();
+            String body = fpBody(c);
+            long lines = body.lines().count(), bytes = utf8(body), pre = 0;
+            for (String sk : fpList(c, "skills")) pre += skillBodyBytes.getOrDefault(sk, 0L);
+            agentRows.add(new String[] {"`" + a.getFileName().toString().replaceFirst("\\.md$", "") + "`",
+                    "" + lines, tok(bytes, bpt), pre == 0 ? "—" : tok(pre, bpt),
+                    fm.getOrDefault("model", "—"), fm.getOrDefault("effort", "—")});
+        }
+        session.add(new String[] {"agent listing (" + agentRows.size() + ")", "—",
+                agentListing + " chars", tok(agentListing, bpt), ""});
+        sessionBytes += agentListing;
+
+        Map<String, Object> mcp = asMap(get(Json.parse(readOrNull(ROOT.resolve(
+                Optional.ofNullable(asStr(fp.get("mcp"))).orElse(".mcp.json")))), "mcpServers"));
+        List<String> servers = mcp == null ? List.of() : new ArrayList<>(mcp.keySet());
+        session.add(new String[] {"MCP servers (" + servers.size() + ")"
+                + (servers.isEmpty() ? "" : ": " + String.join(", ", servers)),
+                "—", "—", "names + instructions", ""});
+
+        out.append("\n### Every session\n\n| Source | Lines | Bytes | ~Tokens | Note |\n|---|---|---|---|---|\n");
+        for (String[] r : session) out.append(fpRow(r));
+        out.append("| **Total** | | ").append(sessionBytes).append(" | ")
+           .append(tok(sessionBytes, bpt)).append(" | MCP not counted |\n");
+
+        out.append("\n### Skills — once invoked, largest first\n\n")
+           .append("| Skill | Body lines | ~Tokens | Listing chars | Files / ~tokens | Injections | Model | Effort | Flags |\n")
+           .append("|---|---|---|---|---|---|---|---|---|\n");
+        skillNums.sort((x, y) -> Long.compare(y[0], x[0]));
+        for (long[] n : skillNums) out.append(fpRow(skillRows.get((int) n[1])));
+
+        out.append("\n### Agents — once started\n\n| Agent | Body lines | ~Tokens | Preloaded ~tokens | Model | Effort |\n|---|---|---|---|---|---|\n");
+        for (String[] r : agentRows) out.append(fpRow(r));
+
+        out.append("\n### Rules with `paths` — once a matching file is read\n\n| Rule | Lines | ~Tokens | paths |\n|---|---|---|---|\n");
+        for (String[] r : scopedRules) out.append(fpRow(r));
+
+        // Hooks: an entry on a matcher event with neither matcher nor `if` spawns on every call.
+        Map<String, Object> hooks = asMap(get(Json.parse(readOrNull(ROOT.resolve(
+                Optional.ofNullable(asStr(fp.get("settings"))).orElse(".claude/settings.json")))), "hooks"));
+        Set<String> matcherEvents = new HashSet<>(asStrList(get(sch, "settings", "matcher_events")));
+        out.append("\n### Hooks — process spawns\n\n| Event | Entries | Narrowed (`matcher` or `if`) | Every occurrence |\n|---|---|---|---|\n");
+        List<String> unnarrowed = new ArrayList<>();
+        if (hooks != null) for (Map.Entry<String, Object> ev : hooks.entrySet()) {
+            int entries = 0, narrowed = 0;
+            for (Object g : asList(ev.getValue())) {
+                String matcher = asStr(get(g, "matcher"));
+                boolean byMatcher = matcherEvents.contains(ev.getKey())
+                        && matcher != null && !matcher.isBlank() && !"*".equals(matcher.strip());
+                for (Object h : asList(get(g, "hooks"))) {
+                    entries++;
+                    if (byMatcher || asStr(get(h, "if")) != null) narrowed++;
+                    else if (matcherEvents.contains(ev.getKey()))
+                        unnarrowed.add(ev.getKey() + " › " + Optional.ofNullable(asStr(get(h, "command"))).orElse("?")
+                                + " " + String.join(" ", asStrList(get(h, "args"))));
+                }
+            }
+            out.append(fpRow(new String[] {ev.getKey(), "" + entries,
+                    matcherEvents.contains(ev.getKey()) ? "" + narrowed : "— (no matcher read)",
+                    "" + (entries - narrowed)}));
+        }
+        for (String u : unnarrowed) over.add("hook with neither `matcher` nor `if` on a tool event — " + u);
+
+        out.append("\n### Past a limit\n\n");
+        if (over.isEmpty()) out.append("None.\n");
+        for (String o : over) out.append("- ").append(o).append('\n');
+        stdout.print(out);
+    }
+
+    static long fpImports(Path file, int depth, int max, Set<Path> seen, List<String[]> rows,
+                          double bpt) {
+        if (depth > max) return 0;
+        String c = readOrNull(file);
+        if (c == null) return 0;
+        String scanned = FP_CODE_SPAN.matcher(FENCE.matcher(c).replaceAll("")).replaceAll("");
+        Matcher m = FP_IMPORT.matcher(scanned);
+        long total = 0;
+        while (m.find()) {
+            String ref = m.group(1).replaceAll("[.,;:)]+$", "");
+            if (ref.startsWith("~")) continue;                 // outside the project: approved per person
+            Path p = (ref.startsWith("/") ? Paths.get(ref) : file.getParent().resolve(ref)).normalize();
+            if (!Files.isRegularFile(p) || !seen.add(p)) continue;
+            String ic = readOrNull(p);
+            long bytes = utf8(ic), lines = ic.lines().count();
+            rows.add(new String[] {"↳ `@" + ref + "` (import, hop " + depth + ")", "" + lines,
+                    "" + bytes, tok(bytes, bpt), ""});
+            total += bytes + fpImports(p, depth + 1, max, seen, rows, bpt);
+        }
+        return total;
+    }
+
+    /** `@path` outside code, the form the runtime imports. */
+    static final Pattern FP_IMPORT = Pattern.compile("(?m)(?:^|\\s)@([A-Za-z0-9_./~-]+)");
+    static final Pattern FP_CODE_SPAN = Pattern.compile("`[^`\\n]*`");
+
+    /** Files matching a glob relative to ROOT, walked from the glob's fixed prefix. */
+    static List<Path> fpFiles(String pattern) throws IOException {
+        if (pattern == null) return List.of();
+        String prefix = pattern.contains("*") ? pattern.substring(0, pattern.indexOf('*')) : pattern;
+        prefix = prefix.contains("/") ? prefix.substring(0, prefix.lastIndexOf('/')) : "";
+        Path start = ROOT.resolve(prefix);
+        if (!Files.isDirectory(start)) return List.of();
+        try (Stream<Path> w = Files.walk(start)) {
+            return w.filter(Files::isRegularFile).filter(p -> matches(pattern, relative(p)))
+                    .sorted().collect(Collectors.toList());
+        }
+    }
+
+    /** The text after the frontmatter block — what the runtime loads. */
+    static String fpBody(String c) {
+        List<String> lines = c.lines().collect(Collectors.toList());
+        int i = 0;
+        while (i < lines.size() && lines.get(i).isBlank()) i++;
+        if (i >= lines.size() || !lines.get(i).strip().equals("---")) return c;
+        for (int j = i + 1; j < lines.size(); j++)
+            if (lines.get(j).strip().equals("---"))
+                return String.join("\n", lines.subList(j + 1, lines.size()));
+        return c;
+    }
+
+    /** A frontmatter key's text: a plain or quoted scalar, or a folded/literal block joined. */
+    static String fpText(String c, String key) {
+        List<String> lines = fpFrontLines(c);
+        for (int i = 0; i < lines.size(); i++) {
+            String l = lines.get(i);
+            if (!l.startsWith(key + ":")) continue;
+            String v = l.substring(key.length() + 1).strip();
+            if (!(v.startsWith(">") || v.startsWith("|"))) return v.replaceAll("^[\"']|[\"']$", "");
+            List<String> parts = new ArrayList<>();
+            for (int j = i + 1; j < lines.size(); j++) {
+                String n = lines.get(j);
+                if (!n.isBlank() && !Character.isWhitespace(n.charAt(0))) break;
+                if (!n.isBlank()) parts.add(n.strip());
+            }
+            return String.join(" ", parts);
+        }
+        return "";
+    }
+
+    /** A frontmatter key's list: `[a, b]`, `a, b`, or indented `- a` lines. */
+    static List<String> fpList(String c, String key) {
+        List<String> lines = fpFrontLines(c), out = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            String l = lines.get(i);
+            if (!l.startsWith(key + ":")) continue;
+            String v = l.substring(key.length() + 1).strip().replaceAll("^\\[|\\]$", "");
+            if (!v.isEmpty()) {
+                for (String s : v.split(",")) if (!s.isBlank()) out.add(s.strip().replaceAll("^[\"']|[\"']$", ""));
+                return out;
+            }
+            for (int j = i + 1; j < lines.size(); j++) {
+                String n = lines.get(j).strip();
+                if (n.startsWith("#")) continue;
+                if (!n.startsWith("- ")) break;
+                out.add(n.substring(2).strip().replaceAll("^[\"']|[\"']$", ""));
+            }
+            return out;
+        }
+        return out;
+    }
+
+    static List<String> fpFrontLines(String c) {
+        List<String> lines = c.lines().collect(Collectors.toList());
+        int i = 0;
+        while (i < lines.size() && lines.get(i).isBlank()) i++;
+        if (i >= lines.size() || !lines.get(i).strip().equals("---")) return List.of();
+        for (int j = i + 1; j < lines.size(); j++)
+            if (lines.get(j).strip().equals("---")) return lines.subList(i + 1, j);
+        return List.of();
+    }
+
+    static double fpNum(Object o, double dflt) { return o instanceof Number n ? n.doubleValue() : dflt; }
+    static long utf8(String s) { return s == null ? 0 : s.getBytes(StandardCharsets.UTF_8).length; }
+    static String tok(long bytes, double bpt) {
+        long t = Math.round(bytes / bpt);
+        return t < 1000 ? "" + t : String.format(Locale.ROOT, "%.1fk", t / 1000.0);
+    }
+    static String fmtNum(double d) { return d == Math.rint(d) ? "" + (long) d : "" + d; }
+    static String fpRow(String[] cells) {
+        return "| " + Arrays.stream(cells).map(x -> x.replace("|", "\\|")).collect(Collectors.joining(" | ")) + " |\n";
+    }
 
     // ── access to already-parsed JSON ───────────────────────────────────────
 

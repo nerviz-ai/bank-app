@@ -344,13 +344,23 @@
     "plans_source": "https://claude.com/pricing, read 2026-10-08",
     "budget_plan": "pro",
     "windows": {
-      "five_hour": {"label": "5 h", "hours": 5, "budget": "five_hour_tokens"},
-      "weekly": {"label": "week", "hours": 168, "budget": "weekly_tokens"}
+      "five_hour": {"label": "5 h", "hours": 5, "budget": "five_hour_tokens", "rate_limits_key": "five_hour"},
+      "weekly": {"label": "week", "hours": 168, "budget": "weekly_tokens", "rate_limits_key": "seven_day"}
     },
     "plans": {
       "pro": {"label": "Pro", "multipliers": {"five_hour": 1, "weekly": 1}},
       "max-5x": {"label": "Max 5x", "multipliers": {"five_hour": 5, "weekly": null}},
       "max-20x": {"label": "Max 20x", "multipliers": {"five_hour": 20, "weekly": null}}
+    },
+    "$comment_plan_usage": "The account's real plan usage, measured around a run: the snapshot a personal status line (or any personal producer writing the same shape) leaves at `snapshot` — the status line's stdin as received. `audit` reads `<root>.<window rate_limits_key>.<used>` and `.<resets_at>` at run open, at `flush` (provisional) and at `close` (final: the status line refreshes 300 ms after the last response, after `Stop`), and copies those numbers only, never other text of the file — no redaction applies. Older than `max_age_minutes`, absent or unreadable → `not captured`; absent with a `not_available_env` variable set → `not available`; a changed `resets_at` → `not valid`. `~` is `user.home`. The producer never travels: its snippet is .claude/skills/audit-usage/templates/statusline-rate-limits.json.example, pasted by the person into ~/.claude/settings.json; an existing project learns of it from the `audit-plan-usage-statusline` entry of `migrations`, whose prompt the person pastes. ",
+    "plan_usage": {
+      "snapshot": "~/.claude/rate-limits.json",
+      "max_age_minutes": 15,
+      "root": "rate_limits",
+      "used": "used_percentage",
+      "resets_at": "resets_at",
+      "resolution_pp": 0.1,
+      "not_available_env": ["CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "CLAUDE_CODE_USE_ANTHROPIC_AWS", "CLAUDE_CODE_USE_MANTLE", "ANTHROPIC_API_KEY"]
     },
     "$comment_genesis": "Read by `audit genesis <project> <session-id>`, which `/init-project` runs after `project-initializer` returns and before `git-publish`. `file` is the generated project's genesis record, relative to its root; `command` the skill whose entry marks Started in this session's transcript — a `<command-name>` message when it was typed, or the prompt behind a Skill tool result whose `toolUseResult.commandName` names it (0164); `placeholders` the three literals step 8.6 of project-bootstrap leaves in the file and this mode replaces — Started, Finished (the moment it runs), and the tokens of the main transcript and every subagent transcript from Started on — no cost, the trail prices nothing (0134). The model never writes those three values. , Started anchors amended by a decision recorded in the meta-repository",
     "genesis": {
@@ -366,6 +376,26 @@
       ],
       "value_prefixes": ["Bearer ", "ghp_", "github_pat_", "sk-", "xoxb-", "AKIA"]
     }
+  },
+
+  "footprint": {
+    "$comment": "Read by ArchHook.java `footprint`, the read-only mode `harness-lessons` injects: what this `.claude/` puts in context every session (root CLAUDE.md and what it imports, rules without `paths`, the listing of every model-invocable skill and every agent, MCP servers) and what each piece adds when it loads (skill body, references, injections; agent body and preloaded skills), plus hook registrations per event and how many of those on a `settings.matcher_events` event spawn a process on every occurrence. Report only: `limits` marks a number past a documented threshold with `over`, and nothing exits non-zero on it — no run was ever measured over one (0188, mirror of invariant 6). `bytes_per_token` turns bytes into an ESTIMATE the output labels as such: the exact count needs the `count_tokens` API, a network call and a key. Each limit's source is the `harness-lessons` reference that cites it, re-read past its window; a limit changes here, never in the Java. ",
+    "bytes_per_token": 4,
+    "claude_md": ["CLAUDE.md", ".claude/CLAUDE.md"],
+    "import_max_depth": 4,
+    "skills": ".claude/skills/*/SKILL.md",
+    "agents": ".claude/agents/*.md",
+    "rules": ".claude/rules/*.md",
+    "settings": ".claude/settings.json",
+    "mcp": ".mcp.json",
+    "listing_fields": ["description", "when_to_use"],
+    "limits": {
+      "claude_md_lines": 200,
+      "skill_body_lines": 500,
+      "listing_chars": 1536,
+      "reference_toc_lines": 100
+    },
+    "toc_dirs": ["references"]
   },
 
   "tests": {
@@ -481,12 +511,23 @@
         "skills": ["git-publish", "triage-issue", "new-project", "project-config"]
       },
       "report": {
-        "$comment": "Runs an analyzer over the project, writes one findings file under docs/lessons-learned/, and — behind a confirmation — publishes a sanitized copy outside the working tree. Not `build`, whose reason to exist is materializing files outside docs/, and not `ops`, which writes no file and allows sonnet only while this class's tracing step is judgment. `## Failure modes` is required because every run depends on two external systems — the analyzer's server and the forge the issue goes to — and each one fails in a way the reader must be told how to leave. Blocked during design: a run is a full build. The territory is the class default on purpose, so a second report skill joins by name, with no override. Design: `report-issue` is that second skill: the one door from a generated project to the meta-repository, so sonar-lessons now writes its findings file and prints the command instead of publishing — one owner of the privacy rule and the duplicate search. ",
+        "$comment": "Runs an analyzer over the project, writes one findings file under docs/lessons-learned/, and — behind a confirmation — publishes a sanitized copy outside the working tree. Not `build`, whose reason to exist is materializing files outside docs/, and not `ops`, which writes no file and allows sonnet only while this class's tracing step is judgment. `## Failure modes` is required because every run depends on two external systems — the analyzer's server and the forge the issue goes to — and each one fails in a way the reader must be told how to leave. Blocked during design: a run is a full build. The territory is the class default on purpose, so a second report skill joins by name, with no override. Design: `report-issue` is that second skill: the one door from a generated project to the meta-repository, so sonar-lessons now writes its findings file and prints the command instead of publishing — one owner of the privacy rule and the duplicate search. Design: `harness-lessons` is the one override: in the Nerviz repository its lessons file is history about this `.claude/`, so it goes beside the run reports in `.claude/lessons-learned/` instead of the public `docs/` tree; in a generated project it stays in `docs/lessons-learned/`, gitignored there and read by `report-issue`. The glob is `harness-*.md` alone, never the run reports beside it. ",
         "blocked_during_design": true,
         "allowed_models": ["opus"],
         "write_allow": ["docs/lessons-learned/**"],
         "required_sections": ["## Procedure", "## Failure modes"],
-        "skills": ["sonar-lessons", "report-issue"]
+        "overrides": {
+          "harness-lessons": {"write_allow": ["docs/lessons-learned/**", ".claude/lessons-learned/harness-*.md"]}
+        },
+        "skills": ["sonar-lessons", "report-issue", "harness-lessons"]
+      },
+      "media": {
+        "$comment": "Renders diagrams of this repository's own `.claude/` from its data and writes them under docs/diagrams/ — and nothing else. Not `report`, whose reason to exist is an analyzer that writes a findings file and publishes it through report-issue: a renderer is neither, and borrowing its class with an override would name a territory the class does not describe (option B of the record). `blocked_during_design` because rendering is not part of a design run. Meta-repository only: the skill is in export.skills.exclude. ",
+        "blocked_during_design": true,
+        "allowed_models": ["sonnet"],
+        "write_allow": ["docs/diagrams/**"],
+        "required_sections": ["## Procedure", "## Failure modes"],
+        "skills": ["nerviz-diagrams"]
       }
     }
   },
@@ -1030,6 +1071,12 @@
         "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "hexagonal-single-module", "modular-monolith", "layered", "vertical-slice", "onion", "onion-single-module"],
         "note": "The executable jar now has a fixed name, `app.jar`, and the Dockerfile copies that. Code generated before this change copies `<artifactId>-<version>.jar`: the first version bump renames the jar, `docker build` fails on the COPY, and `./mvnw verify` or `./gradlew build` stays green because nothing in the build or the generated CI builds the image. Nothing breaks until the version changes; the fix is two lines in the build file of the module that holds the `@SpringBootApplication` class and one in the Dockerfile.",
         "prompt": "Give this project's executable jar a fixed name and make the Dockerfile copy that. If there is no Dockerfile at the root, tell me so and stop. Find the module that holds the @SpringBootApplication class (the root project in a single-module layout). Maven: in that module's pom.xml, add <finalName>app</finalName> as the first child of <build>; if the module has no spring-boot-maven-plugin in <build><plugins> (a multi-module project whose parent does not declare it), add it too, without a version. Gradle: in that module's build.gradle, add bootJar { archiveFileName = 'app.jar' } and, if the org.springframework.boot plugin is not applied there, apply it in a plugins {} block at the top of the file, without a version. Then in the Dockerfile change the COPY --from=build source to <that module's path, empty for a single-module layout>target/app.jar on Maven, or build/libs/app.jar under the module's path on Gradle. Change nothing else. Run docker build -t app-check . and show me the result; if Docker is not available, run ./mvnw -DskipTests package or ./gradlew bootJar instead and show me the path of the jar it wrote."
+      },
+      {
+        "id": "audit-plan-usage-statusline",
+        "blueprints": ["clean-architecture-single-module", "clean-architecture-multi-module", "hexagonal", "hexagonal-single-module", "modular-monolith", "layered", "vertical-slice", "onion", "onion-single-module"],
+        "note": "The audit can now report how many percentage points of your plan's 5-hour and weekly windows each skill or agent run consumed, measured from the account (decision 0194). It reads a snapshot that a status line in your own ~/.claude/settings.json writes — never one in the project's settings, which would override everyone else's. Optional and personal: no project code is left behind, nothing breaks without it, and on an API key, Bedrock, Vertex or Foundry there is nothing to measure. Without it, reports say `not captured` and `/arch-doctor` shows `Plan usage ⚪`. POSIX sh only (macOS, Linux, WSL).",
+        "prompt": "Add the plan-usage status line to my personal Claude Code settings. Read .claude/skills/audit-usage/templates/statusline-rate-limits.json.example, including its `$comment`. Then read ~/.claude/settings.json (if it does not exist, the result is a new file holding only the `statusLine` key). If it has no `statusLine`, the result adds the template's `statusLine` entry as is. If it already has one, keep my command running: append `; printf '%s' \"$input\" | <my current command>` to the template's command, keep my own `padding` and `refreshInterval` if set, and tell me what you changed. Touch no other key of the file and never write this into the project's .claude/settings.json. Show me the whole resulting `statusLine` block and wait for my confirmation before writing. After writing, tell me to restart claude, since settings are read at startup, and that `java -jar .claude/hooks/ArchHook.jar doctor` should then show the `Plan usage` line with ✅ once a session has had a response."
       }
     ]
   },

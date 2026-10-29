@@ -87,6 +87,9 @@ What the block's vocabulary means:
   `budget` or `time` says which limit binds. Max 5x and 20x are multiples of Pro on 5 hours,
   the only multiplier Anthropic publishes; Max weekly has no column. A root row counts the
   whole run, what typing that command spends; a `(chained, own)` row only that piece's share.
+- **Plan usage (measured)** — the account's 5-hour and weekly percentages before and after a
+  run, from the personal status line's snapshot; the block computed the delta and each cell's
+  reason; never recomputed.
 
 ## Procedure
 
@@ -113,6 +116,10 @@ includes time the user spent thinking. Then add what the block can't:
    repeatedly is a bad spec, not bad luck.
 4. **What to read next** — the single most relevant report, and the exact
    `/audit-usage <fragment>` that opens it.
+5. **What to cut** — only when one piece holds the largest share of own tokens, the worst
+   failure ratio, or a peak that stands out: print `/harness-lessons <piece>`, which judges that
+   piece against the harness best practices and writes the lesson. Print it, never invoke it —
+   it runs on `opus` and writes a file.
 
 If the plan windows say `not configured`, say so and point at
 `.claude/audit-usage/plan-limits.json`, set with `/project-config` or
@@ -121,6 +128,10 @@ If the plan windows say `not configured`, say so and point at
 100%). Never suggest a budget: Anthropic publishes none, and one written from memory looks as
 authoritative as a measured one. Never convert anything to a currency either: the trail prices
 nothing, and a rate written from memory is wrong the day after it changes.
+
+If the plan usage says `not captured — no snapshot`, say so and point at
+`.claude/skills/audit-usage/templates/statusline-rate-limits.json.example` and § Plan usage of
+`docs/<lang>/08-audit-usage.md`; never write `~/.claude/settings.json`.
 
 ### 3 · Single run
 
