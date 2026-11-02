@@ -117,6 +117,11 @@ public record Customer(
         return identity instanceof CustomerIdentity.Anonymized;
     }
 
+    /** Eligibility to hold an account: {@code ACTIVE} and not anonymized. Reads state only. */
+    public boolean canHoldAccount() {
+        return status == CustomerStatus.ACTIVE && !isAnonymized();
+    }
+
     private static void requireNotInFuture(LocalDate birthDate, LocalDate today) {
         if (birthDate.isAfter(today)) {
             throw new ValidationException("BIRTH_DATE_IN_FUTURE", "birth date cannot be in the future");

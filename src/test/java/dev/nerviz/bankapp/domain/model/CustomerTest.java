@@ -399,6 +399,22 @@ class CustomerTest {
                 .doesNotContain("1990-05-17");
     }
 
+    @ParameterizedTest
+    @EnumSource(CustomerStatus.class)
+    void canHoldAccountOnlyWhenActive(CustomerStatus status) {
+        Customer customer = CustomerFixtures.withStatus(status);
+
+        assertThat(customer.canHoldAccount()).isEqualTo(status == CustomerStatus.ACTIVE);
+    }
+
+    @Test
+    void anonymizedActiveCustomerCannotHoldAccount() {
+        Customer anonymized = CustomerFixtures.anonymized();
+
+        assertThat(anonymized.status()).isEqualTo(CustomerStatus.ACTIVE);
+        assertThat(anonymized.canHoldAccount()).isFalse();
+    }
+
     private static LocalDate birthDateOf(Customer customer) {
         return ((CustomerIdentity.Identified) customer.identity()).birthDate();
     }

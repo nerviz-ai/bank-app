@@ -107,6 +107,21 @@ class IdempotencyKeyStoreIT {
     }
 
     @Test
+    void rejectsSameKeyFromAnotherCaller() {
+        UUID key = UUID.randomUUID();
+        store.claim(request(key, HASH_A));
+        StoredResponse response = new StoredResponse(201, "{\"id\":\"abc\"}", "{}");
+        transactions.executeWithoutResult(status -> store.complete(key, response));
+        IdempotencyRequest otherCaller = new IdempotencyRequest(
+                key, "POST /api/v1/customers", "alice", HASH_A, Instant.parse("2026-01-15T10:00:00Z"));
+
+        assertThatThrownBy(() -> store.claim(otherCaller))
+                .isInstanceOf(ConflictException.class)
+                .extracting("errorCode")
+                .isEqualTo("IDEMPOTENCY_KEY_REUSED");
+    }
+
+    @Test
     void rejectsKeyStillInProgress() {
         UUID key = UUID.randomUUID();
         store.claim(request(key, HASH_A));

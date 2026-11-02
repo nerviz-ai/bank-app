@@ -1,5 +1,5 @@
 ---
-status: approved
+status: implemented
 ---
 
 # UC-007 — Open account
@@ -158,25 +158,25 @@ none — every partial recorded `none`.
 
 ## Implementation order (checklist)
 
-- [ ] 1. Domain exceptions — REUSE, nothing new
-- [ ] 2. Value objects: `AccountId`, `Money`, `AccountStatus`, `Actor`
-- [ ] 3. Aggregate `Account` + `Customer.canHoldAccount()`
-- [ ] 4. Events — n/a, none
-- [ ] 5. `OpenAccountCommand`
-- [ ] 6. `OpenAccountUseCase`
-- [ ] 7. `AccountRepository`
-- [ ] 8. Migration `V6__create_accounts.sql` — from `20-persistence.md` § 4
-- [ ] 9. `AccountEntity`
-- [ ] 10. `AccountJpaRepository`
-- [ ] 11. `AccountPersistenceMapper` + `AccountRepositoryJpaAdapter`
-- [ ] 12. Persistence properties — n/a, inherited
-- [ ] 13. `AccountResponse` + `AccountMapper`
-- [ ] 14. `AccountApi`, `OpenAccountOpenApiDocs`, `AccountController`; versioning inherited
-- [ ] 15. `@Idempotent` on the endpoint + `IdempotencyAspect` caller scope CHANGE
-- [ ] 16. Test fixtures
-- [ ] 17. Unit tests
-- [ ] 18. Integration + contract tests (incl. Block S: `Roles.CUSTOMER`, `SecurityConfig` rule, `CurrentActorResolver`, property)
-- [ ] 19. `./mvnw clean verify` — green build, coverage gate
+- [x] 1. Domain exceptions — REUSE, nothing new
+- [x] 2. Value objects: `AccountId`, `Money`, `AccountStatus`, `Actor`
+- [x] 3. Aggregate `Account` + `Customer.canHoldAccount()`
+- [x] 4. Events — n/a, none
+- [x] 5. `OpenAccountCommand`
+- [x] 6. `OpenAccountUseCase`
+- [x] 7. `AccountRepository`
+- [x] 8. Migration `V6__create_accounts.sql` — from `20-persistence.md` § 4
+- [x] 9. `AccountEntity`
+- [x] 10. `AccountJpaRepository`
+- [x] 11. `AccountPersistenceMapper` + `AccountRepositoryJpaAdapter`
+- [x] 12. Persistence properties — n/a, inherited
+- [x] 13. `AccountResponse` + `AccountMapper`
+- [x] 14. `AccountApi`, `OpenAccountOpenApiDocs`, `AccountController`; versioning inherited
+- [x] 15. `@Idempotent` on the endpoint + `IdempotencyAspect` caller scope CHANGE
+- [x] 16. Test fixtures
+- [x] 17. Unit tests
+- [x] 18. Integration + contract tests (incl. Block S: `Roles.CUSTOMER`, `SecurityConfig` rule, `CurrentActorResolver`, property)
+- [x] 19. `./mvnw clean verify` — green build, coverage gate
 
 ## Resolved divergences
 

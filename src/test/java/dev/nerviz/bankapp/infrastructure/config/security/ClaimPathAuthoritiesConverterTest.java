@@ -12,7 +12,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 class ClaimPathAuthoritiesConverterTest {
 
     private final ClaimPathAuthoritiesConverter converter = new ClaimPathAuthoritiesConverter(
-            new TokenAuthoritiesProperties("sub", List.of("roles"), List.of("scope")));
+            new TokenAuthoritiesProperties("sub", List.of("roles"), List.of("scope"), "customer_id"));
 
     @Test
     void mapsRolesClaimToRoleAuthorities() {
@@ -53,7 +53,7 @@ class ClaimPathAuthoritiesConverterTest {
     @Test
     void readsNestedClaimPath() {
         ClaimPathAuthoritiesConverter nested = new ClaimPathAuthoritiesConverter(
-                new TokenAuthoritiesProperties("sub", List.of("realm_access.roles"), List.of()));
+                new TokenAuthoritiesProperties("sub", List.of("realm_access.roles"), List.of(), "customer_id"));
         Jwt jwt = jwt(Map.of("realm_access", Map.of("roles", List.of("OPERATOR"))));
 
         assertThat(nested.convert(jwt))
@@ -64,7 +64,7 @@ class ClaimPathAuthoritiesConverterTest {
     @Test
     void pathThroughANonMapYieldsNoAuthority() {
         ClaimPathAuthoritiesConverter nested = new ClaimPathAuthoritiesConverter(
-                new TokenAuthoritiesProperties("sub", List.of("realm_access.roles"), List.of()));
+                new TokenAuthoritiesProperties("sub", List.of("realm_access.roles"), List.of(), "customer_id"));
         Jwt jwt = jwt(Map.of("realm_access", "not-a-map"));
 
         assertThat(nested.convert(jwt)).isEmpty();

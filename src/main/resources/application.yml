@@ -212,6 +212,7 @@ app:
       principal-claim: sub
       roles-claims: roles
       scopes-claims: scope
+      customer-id-claim: customer_id
 
   jobs:
     prune-idempotency-keys:

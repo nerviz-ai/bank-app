@@ -65,10 +65,11 @@ class IdempotencyKeyStore implements IdempotencyKeyPort {
     }
 
     private IdempotencyClaim resolveCollision(IdempotencyKeyEntity existing, IdempotencyRequest request) {
-        if (!existing.getBodyHash().equals(request.bodyHash())) {
+        if (!existing.getBodyHash().equals(request.bodyHash())
+                || !existing.getCallerIdentity().equals(request.callerIdentity())) {
             throw new ConflictException(
                     "IDEMPOTENCY_KEY_REUSED",
-                    "Idempotency-Key " + request.key() + " was already used with a different request body");
+                    "Idempotency-Key " + request.key() + " was already used with a different request");
         }
         if (existing.getStatus() == IdempotencyStatus.COMPLETED) {
             return new IdempotencyClaim.Replay(new StoredResponse(
