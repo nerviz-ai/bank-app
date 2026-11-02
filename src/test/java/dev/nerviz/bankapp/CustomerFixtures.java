@@ -4,6 +4,7 @@ import dev.nerviz.bankapp.application.usecase.customer.CreateCustomerCommand;
 import dev.nerviz.bankapp.domain.model.Customer;
 import dev.nerviz.bankapp.domain.model.CustomerId;
 import dev.nerviz.bankapp.domain.model.CustomerStatus;
+import dev.nerviz.bankapp.domain.model.KycVerdict;
 import dev.nerviz.bankapp.domain.model.SecurityNumber;
 import java.time.Clock;
 import java.time.Instant;
@@ -40,6 +41,22 @@ public final class CustomerFixtures {
     /** Anonymized through the real transition, never rebuilt through {@code rehydrate}. */
     public static Customer anonymized() {
         return withStatus(CustomerStatus.ACTIVE).anonymize(FIXED_CLOCK);
+    }
+
+    /** Eligible to hold an account, reached through the real transition: register, then KYC approved. */
+    public static Customer activeCustomer() {
+        return customer().recordKycVerdict(KycVerdict.APPROVED);
+    }
+
+    /** A second eligible customer: the security number is unique, so a test with two needs another one. */
+    public static Customer activeCustomer(String securityNumber) {
+        return Customer.register(
+                        CustomerId.of(UUID.randomUUID()),
+                        NAME,
+                        SecurityNumber.of(securityNumber),
+                        BIRTH_DATE,
+                        FIXED_CLOCK)
+                .recordKycVerdict(KycVerdict.APPROVED);
     }
 
     public static CreateCustomerCommand command() {

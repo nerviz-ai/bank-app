@@ -34,6 +34,7 @@ public class SecurityConfig {
         "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/springwolf/docs/**"
     };
     private static final String CUSTOMERS = "/api/*/customers";
+    private static final String CUSTOMER_ACCOUNTS = CUSTOMERS + "/*/accounts";
 
     AuthenticationMechanism mechanism;
     ProblemDetailAuthenticationEntryPoint entryPoint;
@@ -67,6 +68,7 @@ public class SecurityConfig {
         requests.requestMatchers(EndpointRequest.toAnyEndpoint()).hasRole(access.actuatorRole());
         requests.requestMatchers(HttpMethod.POST, CUSTOMERS).permitAll();
         requests.requestMatchers(HttpMethod.DELETE, CUSTOMERS + "/*").hasRole(Roles.DATA_PROTECTION_OFFICER);
+        requests.requestMatchers(HttpMethod.POST, CUSTOMER_ACCOUNTS).hasAnyRole(Roles.CUSTOMER, Roles.OPERATOR);
         requests.anyRequest().authenticated();
     }
 

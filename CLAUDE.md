@@ -6,6 +6,10 @@ Spring Boot · Java 21 · Build: maven · Architecture: **Clean Architecture (Un
 case, forever — renaming it is a migration of every topic, not a refactor. Whoever designs
 messaging reads this line; nobody decides the prefix inside a use case.
 
+**Mappers: manual.** Every mapper is a class of plain methods written by hand
+(`.claude/rules/mapping.md`). Switching to MapStruct converts every mapper at once: delete this
+paragraph and the next `/new-feature-implement` offers the install again.
+
 **Transport: topology A — TLS terminates at the edge.** The application holds no key and trusts
 `X-Forwarded-*` only from `TRUSTED_PROXIES`; HSTS is written by the application, never by the
 edge. No local Caddy edge: the local profile runs plain HTTP on 8080. Norms:

@@ -91,6 +91,21 @@ class CreateCustomerIdempotencyIT {
     }
 
     @Test
+    void storesPublicEndpointKeyUnderAnonymousCaller() throws Exception {
+        String key = "0190f3b2-6c1e-7a40-9b8e-2f1d4c5a6b7f";
+
+        mockMvc.perform(post("/api/v1/customers")
+                        .header("Idempotency-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(CustomerFixtures.requestJson()))
+                .andExpect(status().isCreated());
+
+        String caller = jdbcTemplate.queryForObject(
+                "SELECT caller_identity FROM idempotency_keys WHERE idempotency_key = ?::uuid", String.class, key);
+        assertThat(caller).isEqualTo("anonymous");
+    }
+
+    @Test
     void releasesKeyWhenCreationFails() throws Exception {
         String key = "0190f3b2-6c1e-7a40-9b8e-2f1d4c5a6b7e";
 

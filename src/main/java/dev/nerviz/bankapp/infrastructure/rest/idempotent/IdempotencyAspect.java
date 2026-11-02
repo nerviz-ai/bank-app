@@ -18,6 +18,9 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -52,8 +55,8 @@ class IdempotencyAspect {
         UUID key = UUID.fromString(httpRequest.getHeader(IdempotencyKeyInterceptor.HEADER));
         Object requestBody = joinPoint.getArgs()[idempotent.bodyArgIndex()];
         String route = httpRequest.getMethod() + " " + httpRequest.getRequestURI();
-        IdempotencyRequest request = new IdempotencyRequest(
-                key, route, CALLER_PLACEHOLDER, requestHasher.hash(requestBody), clock.instant());
+        IdempotencyRequest request =
+                new IdempotencyRequest(key, route, callerIdentity(), requestHasher.hash(requestBody), clock.instant());
 
         IdempotentOutcome<ResponseEntity<Object>> outcome =
                 idempotentExecution.execute(request, () -> proceedUnchecked(joinPoint), responseCodec::encode);
@@ -68,6 +71,21 @@ class IdempotencyAspect {
     @SneakyThrows
     private ResponseEntity<Object> proceedUnchecked(ProceedingJoinPoint joinPoint) {
         return (ResponseEntity<Object>) joinPoint.proceed();
+    }
+
+    /**
+     * The key is scoped by who is calling: two authenticated callers choosing the same key must
+     * never replay each other's response. A public endpoint has no principal and keeps the
+     * placeholder.
+     */
+    private static String callerIdentity() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            return CALLER_PLACEHOLDER;
+        }
+        return authentication.getName();
     }
 
     private HttpServletRequest currentHttpRequest() {
